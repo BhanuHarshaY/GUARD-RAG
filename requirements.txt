@@ -1,0 +1,8 @@
+groq
+faiss-cpu
+sentence-transformers
+pandas
+tqdm
+transformers
+jupyter
+numpy

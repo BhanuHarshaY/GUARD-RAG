@@ -89,7 +89,7 @@ cd GUARD-RAG
 
 ### 2. Install dependencies
 ```bash
-pip install groq faiss-cpu sentence-transformers pandas tqdm transformers
+pip install -r requirements.txt
 ```
 
 ### 3. Set your Groq API key
@@ -106,25 +106,15 @@ data/tatqa_dataset_dev.json
 ```
 
 ### 5. Run
-Open `notebooks/experiments.ipynb` and run all cells.  
-Or from Python:
-```python
-from config import client, embed_model, BASE_MODEL, JUDGE_MODEL
-from data.loader import load_tatqa
-from indexing.vector_store import build_vector_store
-from pipeline import run_comparison
 
-samples = load_tatqa("data/tatqa_dataset_train.json", max_samples=100)
-baseline_index, baseline_chunks, baseline_metadata = build_vector_store(samples, embed_model, use_table_aware_chunking=False)
-improved_index, improved_chunks, improved_metadata = build_vector_store(samples, embed_model, use_table_aware_chunking=True)
+**Option A — Script (simplest):**
+```bash
+python run.py
+```
 
-t1, t2, t3 = run_comparison(
-    samples[0]["question"],
-    baseline_index, baseline_chunks, baseline_metadata,
-    improved_index, improved_chunks, improved_metadata,
-    embed_model, client, BASE_MODEL, JUDGE_MODEL,
-    mode="improved"
-)
+**Option B — Notebook:**
+```bash
+jupyter notebook notebooks/experiments.ipynb
 ```
 
 ---
