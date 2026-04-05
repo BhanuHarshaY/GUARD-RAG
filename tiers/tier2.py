@@ -34,7 +34,7 @@ Return ONLY the answer, no explanation.
     total_tokens = 0
 
     for _ in range(k):
-        out = ask_llm(sc_prompt, client=client, model=BASE_MODEL, temperature=0.7, max_tokens=220)
+        out = ask_llm(sc_prompt, client=client, model=BASE_MODEL, temperature=0.7, max_tokens=150)
         candidates.append(strip_refinement_prefix(out["text"]))
         total_latency += out["latency"]
         total_tokens += out["tokens"]
@@ -60,16 +60,15 @@ Draft answer:
 {draft_answer}
 
 Instructions:
-- Keep all supported parts of the draft.
-- Remove unsupported claims.
-- If the question is asking for components and the evidence supports only some components, return the supported components instead of falling back to "Insufficient information."
-- Do NOT explain your reasoning.
-- Return ONLY the corrected final answer.
+- Remove any claims from the draft answer that are not supported by the evidence.
+- If the draft answer is fully supported, keep it.
+- If nothing is supported, output exactly "Insufficient information."
+- Output ONLY the exact value, name, or list. Do not include conversational filler like 'The answer is' or 'Based on the evidence'.
 
 Final answer:
 """.strip()
 
-    out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=220)
+    out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=150)
     final_answer = strip_refinement_prefix(out["text"])
 
     return {

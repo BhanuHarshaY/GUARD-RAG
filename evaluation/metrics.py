@@ -15,8 +15,9 @@ def _split_sentences(text):
 def normalize_answer(s):
     s = str(s).lower().strip()
     s = re.sub(r'\b(a|an|the)\b', ' ', s)
-    preserve = {'.', ',', '%', '-'}
+    preserve = {'.', ',', '-'}
     s = ''.join(ch for ch in s if ch not in string.punctuation or ch in preserve)
+    s = re.sub(r'[$%]', '', s)
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 

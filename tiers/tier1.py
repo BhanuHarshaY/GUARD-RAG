@@ -11,7 +11,7 @@ Rules:
 1. Use only facts explicitly present in the evidence.
 2. If the question asks what something consists of / includes / contains, list the supported components explicitly.
 3. If the evidence is partial, give the supported partial answer rather than saying "Insufficient information."
-4. Be concise and factual.
+4. Answer with ONLY the value(s) or fact(s) asked for. No explanations, no reasoning steps, no sentences like "Based on the evidence" or "According to the data". Just the answer.
 5. Do not mention document IDs or retrieval process.
 
 Evidence:

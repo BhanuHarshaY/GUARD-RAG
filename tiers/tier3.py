@@ -265,11 +265,12 @@ Grounder's verdicts:
 {grounder_output}
 
 Instructions:
-- If all challenged claims were SUPPORTED by the Grounder: prefix your response with [APPROVE] and return the draft answer unchanged.
-- If some claims were CONCEDED: prefix your response with [REVISE] and return a revised answer using ONLY the supported claims.
+- If all challenged claims were SUPPORTED by the Grounder: prefix your response with [APPROVE] and return the draft answer.
+- If some claims were CONCEDED: prefix your response with [REVISE] and return a corrected answer using ONLY the supported claims and evidence.
 - If ALL claims were CONCEDED and nothing is supported: prefix your response with [ABSTAIN] and return exactly "Insufficient information."
+- CRITICAL: Return ONLY the direct factual answer. No explanations, no reasoning, no phrases like "Based on the evidence". Just the answer value(s).
 - Use only facts from the evidence. Do NOT introduce new claims.
-- Format: [VERDICT] <answer text>
+- Format: [VERDICT] <concise answer>
 
 Response:
 """.strip()
