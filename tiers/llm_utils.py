@@ -2,14 +2,25 @@ import re
 import time
 
 
-def ask_llm(prompt, client, model, temperature=0.0, max_tokens=300):
+def ask_llm(prompt, client, model, temperature=0.0, max_tokens=300, max_retries=6):
     start = time.time()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    delay = 5.0
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            break
+        except Exception as e:
+            if "rate_limit_exceeded" in str(e) or "429" in str(e):
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    delay = min(delay * 2, 60.0)
+                    continue
+            raise
     latency = round(time.time() - start, 3)
 
     text = response.choices[0].message.content.strip()
