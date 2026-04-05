@@ -42,7 +42,7 @@ def extract_supported_row_labels(retrieved):
 def _split_into_sentences(text):
     """Simple sentence splitter — avoids adding a heavy dependency."""
     parts = re.split(r"(?<=[.!?])\s+|\n+", text.strip())
-    return [p.strip() for p in parts if len(p.strip()) > 8]
+    return [p.strip() for p in parts if len(p.strip()) > 1]
 
 
 def nli_grounding_score(answer, retrieved, nli_model):

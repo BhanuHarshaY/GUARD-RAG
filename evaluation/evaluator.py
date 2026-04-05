@@ -10,7 +10,7 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
     from tiers.tier1 import tier1_basic_rag
     from tiers.tier2 import tier2_self_refine
     from tiers.tier3 import tier3_selective_debate
-    from evaluation.metrics import compute_f1, compute_em
+    from evaluation.metrics import compute_f1, compute_em, compute_hallucination_rate
 
     if mode == "baseline":
         current_index = baseline_index
@@ -44,6 +44,9 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
             "tier1_em": compute_em(t1["answer"], gold),
             "tier2_em": compute_em(t2["answer"], gold),
             "tier3_em": compute_em(t3["answer"], gold),
+            "tier1_hallucination_rate": compute_hallucination_rate(t1["answer"], retrieved, nli_model),
+            "tier2_hallucination_rate": compute_hallucination_rate(t2["answer"], retrieved, nli_model),
+            "tier3_hallucination_rate": compute_hallucination_rate(t3["answer"], retrieved, nli_model),
             "tier1_latency": t1["latency"],
             "tier2_latency": t2["latency"],
             "tier3_latency": t3["latency"],
@@ -75,6 +78,9 @@ def summarize_results(df, label):
         "tier1_avg_latency": df["tier1_latency"].mean(),
         "tier2_avg_latency": df["tier2_latency"].mean(),
         "tier3_avg_latency": df["tier3_latency"].mean(),
+        "tier1_hallucination_rate":     df["tier1_hallucination_rate"].mean(),
+        "tier2_hallucination_rate":     df["tier2_hallucination_rate"].mean(),
+        "tier3_hallucination_rate":     df["tier3_hallucination_rate"].mean(),
         "tier3_debate_rate":            df["tier3_debate_triggered"].mean(),
         "tier3_avg_gatekeeper_score":   df["tier3_gatekeeper_score"].mean(),
         "tier3_abstention_rate":        (df["tier3_adjudicator_verdict"] == "ABSTAIN").mean(),
