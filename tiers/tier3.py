@@ -127,8 +127,161 @@ def gatekeeper_v4(question, retrieved, answer, nli_model=None, threshold=0.20):
     }
 
 
+def _run_skeptic(question, draft_answer, context, client, BASE_MODEL, gatekeeper_signals=None):
+    """
+    Skeptic agent: identifies claims in the draft answer that are NOT directly
+    supported by the retrieved evidence. Returns the raw text output and token count.
+    """
+    signals_section = ""
+    if gatekeeper_signals:
+        bullets = "\n".join(f"- {s}" for s in gatekeeper_signals)
+        signals_section = f"\nConcerns flagged by automated checks:\n{bullets}\n"
+
+    prompt = f"""You are a Skeptic reviewing a draft answer for unsupported claims.
+
+Question:
+{question}
+
+Evidence:
+{context}
+
+Draft answer:
+{draft_answer}
+{signals_section}
+Task:
+List each specific claim in the draft answer that is NOT directly supported by the evidence above.
+- Pay special attention to any concerns flagged above. If missing rows or evidence gaps were flagged, check whether the draft answer omits information that IS present in the evidence.
+- Be precise: quote or closely paraphrase the claim.
+- Ignore claims that ARE clearly supported.
+- If all claims are supported, write: "No unsupported claims found."
+- Output ONLY a bullet list of challenged claims. No explanation.
+
+Challenged claims:
+""".strip()
+
+    out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=300)
+    return out["text"].strip(), out["latency"], out["tokens"]
+
+
+def _verify_grounder_citations(grounder_output, context):
+    """
+    Post-processing: for each SUPPORTED line, check that the quoted evidence
+    actually appears in the context (fuzzy: all words of the quoted phrase
+    present in context, case-insensitive). Flip to CONCEDED if not found.
+    """
+    lines = grounder_output.splitlines()
+    verified = []
+    for line in lines:
+        if line.strip().upper().startswith("SUPPORTED:") and "— Evidence:" in line:
+            # extract quoted evidence after "Evidence:"
+            evidence_part = line.split("— Evidence:", 1)[1].strip().strip('"').strip("'")
+            # fuzzy check: every word of the cited phrase must appear in context
+            ctx_lower = context.lower()
+            words = [w for w in evidence_part.lower().split() if len(w) > 1]
+            if words and not all(w in ctx_lower for w in words):
+                # citation not found — flip to CONCEDED
+                claim_part = line.split("— Evidence:", 1)[0].replace("SUPPORTED:", "", 1).strip()
+                line = f"CONCEDED: {claim_part}"
+        verified.append(line)
+    return "\n".join(verified)
+
+
+def _run_grounder(question, draft_answer, skeptic_output, context, client, BASE_MODEL):
+    """
+    Grounder agent: defends or concedes each challenged claim using only cited evidence.
+    Applies post-processing to flip unverifiable citations to CONCEDED.
+    Returns the raw text output and token count.
+    """
+    prompt = f"""You are a Grounder defending a draft answer using ONLY the evidence provided.
+
+Question:
+{question}
+
+Evidence:
+{context}
+
+Draft answer:
+{draft_answer}
+
+Challenged claims (from Skeptic):
+{skeptic_output}
+
+Task:
+For each challenged claim:
+- If the evidence supports it: write "SUPPORTED: <claim> — Evidence: <exact quote or value from evidence>"
+- If the evidence does NOT support it: write "CONCEDED: <claim>"
+
+Output ONLY the per-claim verdicts. No extra commentary.
+
+Grounder verdicts:
+""".strip()
+
+    out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=400)
+    raw = out["text"].strip()
+    verified = _verify_grounder_citations(raw, context)
+    return verified, out["latency"], out["tokens"]
+
+
+def _parse_adjudicator_verdict(text):
+    """
+    Parse [APPROVE], [REVISE], or [ABSTAIN] prefix from adjudicator output.
+    Returns (verdict_label, answer_text).
+    Falls back to inferring from content if no prefix present.
+    """
+    text = text.strip()
+    for label in ("APPROVE", "REVISE", "ABSTAIN"):
+        if text.upper().startswith(f"[{label}]"):
+            answer = text[len(f"[{label}]"):].strip()
+            return label, answer
+
+    # fallback inference
+    if "insufficient information" in text.lower():
+        return "ABSTAIN", text
+    return "REVISE", text
+
+
+def _run_adjudicator(question, draft_answer, skeptic_output, grounder_output,
+                     context, client, JUDGE_MODEL):
+    """
+    Adjudicator: reads the full debate exchange and produces the final answer.
+    Prefixes output with [APPROVE], [REVISE], or [ABSTAIN] for logging.
+    Returns (final_answer, verdict_label, latency, tokens).
+    """
+    prompt = f"""You are an Adjudicator producing a final answer after a debate.
+
+Question:
+{question}
+
+Evidence:
+{context}
+
+Draft answer:
+{draft_answer}
+
+Skeptic's challenged claims:
+{skeptic_output}
+
+Grounder's verdicts:
+{grounder_output}
+
+Instructions:
+- If all challenged claims were SUPPORTED by the Grounder: prefix your response with [APPROVE] and return the draft answer unchanged.
+- If some claims were CONCEDED: prefix your response with [REVISE] and return a revised answer using ONLY the supported claims.
+- If ALL claims were CONCEDED and nothing is supported: prefix your response with [ABSTAIN] and return exactly "Insufficient information."
+- Use only facts from the evidence. Do NOT introduce new claims.
+- Format: [VERDICT] <answer text>
+
+Response:
+""".strip()
+
+    out = ask_llm(prompt, client=client, model=JUDGE_MODEL, temperature=0.0, max_tokens=280)
+    raw = strip_refinement_prefix(out["text"])
+    verdict, final_answer = _parse_adjudicator_verdict(raw)
+    return final_answer, verdict, out["latency"], out["tokens"]
+
+
 def tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
-                           tier1_result=None, nli_model=None, threshold=0.45):
+                           tier1_result=None, nli_model=None, threshold=0.20):
     if tier1_result is None:
         tier1_result = tier1_basic_rag(question, retrieved, client, BASE_MODEL)
 
@@ -145,45 +298,58 @@ def tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
             "gatekeeper_signals": gate["signals"],
             "gatekeeper_score":   gate["gatekeeper_score"],
             "threshold":          gate["threshold"],
+            "debate_transcript":  None,
         }
 
     context = format_retrieved_context(retrieved, max_chars=4500)
 
-    prompt = f"""
-You are a careful verifier answering ONLY from the evidence below.
+    # --- Step 1: Skeptic ---
+    skeptic_out, s_lat, s_tok = _run_skeptic(
+        question, draft_answer, context, client, BASE_MODEL,
+        gatekeeper_signals=gate["signals"]
+    )
 
-Question:
-{question}
+    # Short-circuit: if Skeptic found nothing to challenge, skip Grounder + Adjudicator
+    if "no unsupported claims" in skeptic_out.lower():
+        return {
+            "answer":             draft_answer,
+            "latency":            round(tier1_result["latency"] + s_lat, 3),
+            "tokens":             tier1_result["tokens"] + s_tok,
+            "debate_triggered":   True,
+            "adjudicator_verdict": "APPROVE",
+            "gatekeeper_signals": gate["signals"],
+            "gatekeeper_score":   gate["gatekeeper_score"],
+            "threshold":          gate["threshold"],
+            "debate_transcript":  {
+                "skeptic":  skeptic_out,
+                "grounder": None,
+            },
+        }
 
-Evidence:
-{context}
+    # --- Step 2: Grounder (with citation verification) ---
+    grounder_out, g_lat, g_tok = _run_grounder(
+        question, draft_answer, skeptic_out, context, client, BASE_MODEL
+    )
 
-Draft answer:
-{draft_answer}
+    # --- Step 3: Adjudicator ---
+    final_answer, verdict, a_lat, a_tok = _run_adjudicator(
+        question, draft_answer, skeptic_out, grounder_out, context, client, JUDGE_MODEL
+    )
 
-Concerns raised:
-{chr(10).join("- " + s for s in gate["signals"])}
-
-Instructions:
-- Use only the evidence.
-- Prefer precision over verbosity.
-- If the question is asking for components, list the supported components explicitly.
-- If the evidence is partial, give the supported partial answer.
-- Do NOT mention the concerns or reasoning.
-- Return ONLY the final answer.
-
-Final answer:
-""".strip()
-
-    out = ask_llm(prompt, client=client, model=JUDGE_MODEL, temperature=0.0, max_tokens=260)
-    final_answer = strip_refinement_prefix(out["text"])
+    total_latency = round(tier1_result["latency"] + s_lat + g_lat + a_lat, 3)
+    total_tokens  = tier1_result["tokens"] + s_tok + g_tok + a_tok
 
     return {
-        "answer":             final_answer,
-        "latency":            round(tier1_result["latency"] + out["latency"], 3),
-        "tokens":             tier1_result["tokens"] + out["tokens"],
-        "debate_triggered":   True,
-        "gatekeeper_signals": gate["signals"],
-        "gatekeeper_score":   gate["gatekeeper_score"],
-        "threshold":          gate["threshold"],
+        "answer":              final_answer,
+        "latency":             total_latency,
+        "tokens":              total_tokens,
+        "debate_triggered":    True,
+        "adjudicator_verdict": verdict,          # "APPROVE" | "REVISE" | "ABSTAIN"
+        "gatekeeper_signals":  gate["signals"],
+        "gatekeeper_score":    gate["gatekeeper_score"],
+        "threshold":           gate["threshold"],
+        "debate_transcript":   {
+            "skeptic":  skeptic_out,
+            "grounder": grounder_out,
+        },
     }

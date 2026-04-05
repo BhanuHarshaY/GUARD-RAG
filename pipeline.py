@@ -58,9 +58,16 @@ def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
     print(f"\n--- TIER 3: Selective Debate ---")
     t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1, nli_model=nli_model)
     print(f"Debate triggered: {t3['debate_triggered']}")
+    print(f"Gatekeeper score: {t3.get('gatekeeper_score', 0.0):.3f} (threshold={t3.get('threshold', 0.20)})")
     if t3.get("debate_triggered"):
         print(f"Gatekeeper signals: {t3.get('gatekeeper_signals', [])}")
-    print(f"Answer: {t3['answer']}")
+        print(f"Adjudicator verdict: {t3.get('adjudicator_verdict', 'N/A')}")
+        transcript = t3.get("debate_transcript") or {}
+        if transcript.get("skeptic"):
+            print(f"\n  [Skeptic]\n{transcript['skeptic']}")
+        if transcript.get("grounder"):
+            print(f"\n  [Grounder]\n{transcript['grounder']}")
+    print(f"\nAnswer: {t3['answer']}")
     print(f"Latency: {t3['latency']}s | Tokens: {t3['tokens']}")
 
     return t1, t2, t3

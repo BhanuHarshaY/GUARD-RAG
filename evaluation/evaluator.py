@@ -50,9 +50,10 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
             "tier1_tokens": t1["tokens"],
             "tier2_tokens": t2["tokens"],
             "tier3_tokens": t3["tokens"],
-            "tier3_debate_triggered": t3.get("debate_triggered", False),
-            "tier3_gatekeeper_score": t3.get("gatekeeper_score", 0.0),
-            "tier3_threshold":        t3.get("threshold", 0.45),
+            "tier3_debate_triggered":    t3.get("debate_triggered", False),
+            "tier3_gatekeeper_score":    t3.get("gatekeeper_score", 0.0),
+            "tier3_threshold":           t3.get("threshold", 0.20),
+            "tier3_adjudicator_verdict": t3.get("adjudicator_verdict", None),
             "mode": mode,
         })
 
@@ -76,4 +77,7 @@ def summarize_results(df, label):
         "tier3_avg_latency": df["tier3_latency"].mean(),
         "tier3_debate_rate":            df["tier3_debate_triggered"].mean(),
         "tier3_avg_gatekeeper_score":   df["tier3_gatekeeper_score"].mean(),
+        "tier3_abstention_rate":        (df["tier3_adjudicator_verdict"] == "ABSTAIN").mean(),
+        "tier3_approve_rate":           (df["tier3_adjudicator_verdict"] == "APPROVE").mean(),
+        "tier3_revise_rate":            (df["tier3_adjudicator_verdict"] == "REVISE").mean(),
     }])
