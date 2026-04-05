@@ -25,6 +25,11 @@ venv/
 *.tsv
 *.parquet
 
+# Generated outputs
+*.png
+sweep_data.csv
+sweep_results.csv
+
 # FAISS indexes
 *.index
 *.faiss

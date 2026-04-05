@@ -7,7 +7,7 @@ Usage:
     python run.py
 """
 
-from config import client, embed_model, BASE_MODEL, JUDGE_MODEL
+from config import client, embed_model, nli_model, BASE_MODEL, JUDGE_MODEL
 from data.loader import load_tatqa
 from indexing.vector_store import build_vector_store
 from pipeline import run_comparison
@@ -40,7 +40,7 @@ run_comparison(
     baseline_index, baseline_chunks, baseline_metadata,
     improved_index, improved_chunks, improved_metadata,
     embed_model, client, BASE_MODEL, JUDGE_MODEL,
-    mode="improved", top_k=TOP_K
+    mode="improved", top_k=TOP_K, nli_model=nli_model
 )
 
 # ── Full evaluation ────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ df_baseline = evaluate_all(
     baseline_index, baseline_chunks, baseline_metadata,
     improved_index, improved_chunks, improved_metadata,
     embed_model, client, BASE_MODEL, JUDGE_MODEL,
-    mode="baseline", max_samples=EVAL_SAMPLES, top_k=TOP_K
+    mode="baseline", max_samples=EVAL_SAMPLES, top_k=TOP_K, nli_model=nli_model
 )
 
 df_improved = evaluate_all(
@@ -61,7 +61,7 @@ df_improved = evaluate_all(
     baseline_index, baseline_chunks, baseline_metadata,
     improved_index, improved_chunks, improved_metadata,
     embed_model, client, BASE_MODEL, JUDGE_MODEL,
-    mode="improved", max_samples=EVAL_SAMPLES, top_k=TOP_K
+    mode="improved", max_samples=EVAL_SAMPLES, top_k=TOP_K, nli_model=nli_model
 )
 
 summary = pd.concat([

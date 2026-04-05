@@ -7,7 +7,7 @@ from tiers.tier3 import tier3_selective_debate
 def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
                    improved_index, improved_chunks, improved_metadata,
                    embed_model, client, BASE_MODEL, JUDGE_MODEL,
-                   mode="improved", top_k=10):
+                   mode="improved", top_k=10, nli_model=None):
     if mode == "baseline":
         current_index = baseline_index
         current_chunks = baseline_chunks
@@ -56,7 +56,7 @@ def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
     print(f"Latency: {t2['latency']}s | Tokens: {t2['tokens']}")
 
     print(f"\n--- TIER 3: Selective Debate ---")
-    t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1)
+    t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1, nli_model=nli_model)
     print(f"Debate triggered: {t3['debate_triggered']}")
     if t3.get("debate_triggered"):
         print(f"Gatekeeper signals: {t3.get('gatekeeper_signals', [])}")

@@ -5,7 +5,7 @@ from tqdm import tqdm
 def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
                  improved_index, improved_chunks, improved_metadata,
                  embed_model, client, BASE_MODEL, JUDGE_MODEL,
-                 mode="improved", max_samples=15, top_k=6):
+                 mode="improved", max_samples=15, top_k=6, nli_model=None):
     from retrieval.retriever import retrieve
     from tiers.tier1 import tier1_basic_rag
     from tiers.tier2 import tier2_self_refine
@@ -30,7 +30,7 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
 
         t1 = tier1_basic_rag(question, retrieved, client, BASE_MODEL)
         t2 = tier2_self_refine(question, retrieved, client, BASE_MODEL, tier1_result=t1)
-        t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1)
+        t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1, nli_model=nli_model)
 
         records.append({
             "question": question,
@@ -51,6 +51,8 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
             "tier2_tokens": t2["tokens"],
             "tier3_tokens": t3["tokens"],
             "tier3_debate_triggered": t3.get("debate_triggered", False),
+            "tier3_gatekeeper_score": t3.get("gatekeeper_score", 0.0),
+            "tier3_threshold":        t3.get("threshold", 0.45),
             "mode": mode,
         })
 
@@ -72,5 +74,6 @@ def summarize_results(df, label):
         "tier1_avg_latency": df["tier1_latency"].mean(),
         "tier2_avg_latency": df["tier2_latency"].mean(),
         "tier3_avg_latency": df["tier3_latency"].mean(),
-        "tier3_debate_rate": df["tier3_debate_triggered"].mean(),
+        "tier3_debate_rate":            df["tier3_debate_triggered"].mean(),
+        "tier3_avg_gatekeeper_score":   df["tier3_gatekeeper_score"].mean(),
     }])
