@@ -34,7 +34,7 @@ Return ONLY the answer, no explanation.
     total_tokens = 0
 
     for _ in range(k):
-        out = ask_llm(sc_prompt, client=client, model=BASE_MODEL, temperature=0.7, max_tokens=150)
+        out = ask_llm(sc_prompt, client=client, model=BASE_MODEL, temperature=0.3, max_tokens=150)
         candidates.append(strip_refinement_prefix(out["text"]))
         total_latency += out["latency"]
         total_tokens += out["tokens"]

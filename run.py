@@ -15,8 +15,8 @@ from evaluation.evaluator import evaluate_all, summarize_results
 import pandas as pd
 
 DATA_PATH = "data/tatqa_dataset_train.json"
-MAX_SAMPLES = 100
-EVAL_SAMPLES = 15
+MAX_SAMPLES = 300
+EVAL_SAMPLES = 50
 TOP_K = 6
 
 # ── Load data ──────────────────────────────────────────────────────────────
@@ -48,13 +48,13 @@ print("\n" + "=" * 70)
 print(f"FULL EVALUATION ({EVAL_SAMPLES} samples)")
 print("=" * 70)
 
-df_baseline = evaluate_all(
-    samples,
-    baseline_index, baseline_chunks, baseline_metadata,
-    improved_index, improved_chunks, improved_metadata,
-    embed_model, client, BASE_MODEL, JUDGE_MODEL,
-    mode="baseline", max_samples=EVAL_SAMPLES, top_k=TOP_K, nli_model=nli_model
-)
+#df_baseline = evaluate_all(
+  #  samples,
+   # baseline_index, baseline_chunks, baseline_metadata,
+    #improved_index, improved_chunks, improved_metadata,
+    #embed_model, client, BASE_MODEL, JUDGE_MODEL,
+    #mode="baseline", max_samples=EVAL_SAMPLES, top_k=TOP_K, nli_model=nli_model
+#)#
 
 df_improved = evaluate_all(
     samples,
@@ -65,14 +65,15 @@ df_improved = evaluate_all(
 )
 
 summary = pd.concat([
-    summarize_results(df_baseline, "baseline"),
+    #summarize_results(df_baseline, "baseline"),
     summarize_results(df_improved, "improved"),
 ], ignore_index=True)
 
 print("\nSUMMARY:")
 print(summary.to_string(index=False))
 
-df_baseline.to_csv("evaluation_baseline.csv", index=False)
+
+#df_baseline.to_csv("evaluation_baseline.csv", index=False)
 df_improved.to_csv("evaluation_improved.csv", index=False)
 summary.to_csv("evaluation_summary.csv", index=False)
 print("\nResults saved to evaluation_baseline.csv, evaluation_improved.csv, evaluation_summary.csv")

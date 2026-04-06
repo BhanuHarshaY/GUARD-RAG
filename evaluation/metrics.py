@@ -38,6 +38,62 @@ def compute_em(prediction, ground_truth):
     return float(normalize_answer(prediction) == normalize_answer(ground_truth))
 
 
+def _chunk_to_natural_language(chunk):
+    """
+    Converts a retrieved chunk dict to a natural language sentence for NLI scoring.
+    Pipe-delimited table chunks confuse DeBERTa; this renders them as prose.
+    Falls back to raw chunk text on any missing field or parse error.
+    """
+    try:
+        chunk_type = chunk.get("chunk_type", "text")
+
+        if chunk_type == "table_cell":
+            row   = chunk.get("row_label", "").strip()
+            col   = chunk.get("column_header", "").strip()
+            val   = chunk.get("value", "").strip()
+            sec   = chunk.get("section_label", "").strip()
+            if not (row and col and val):
+                return chunk["text"]
+            if sec:
+                return f"The {row} for {col} under {sec} is {val}."
+            return f"The {row} for {col} is {val}."
+
+        if chunk_type == "table_row":
+            row = chunk.get("row_label", "").strip()
+            if not row:
+                return chunk["text"]
+            # text format: "Section: X | Row: Y | Col1 | Val1 ; Col2 | Val2"
+            # pairs live after the last "|"-separated header segment, delimited by ";"
+            text = chunk["text"]
+            # strip leading "Section: X | Row: Y" prefix — everything before the first ";"
+            pairs_part = text.split(";")
+            col_vals = []
+            for segment in pairs_part:
+                parts = [p.strip() for p in segment.split("|")]
+                # each segment is "Col | Val" (last two meaningful parts)
+                # filter out "Section: ..." and "Row: ..." prefixes
+                data_parts = [p for p in parts if not p.startswith("Section:") and not p.startswith("Row:")]
+                if len(data_parts) >= 2:
+                    col_name = data_parts[-2].replace("Column:", "").strip()
+                    col_val  = data_parts[-1].replace("Value:", "").strip()
+                    if col_name and col_val:
+                        col_vals.append(f"{col_name}: {col_val}")
+            if not col_vals:
+                return chunk["text"]
+            return f"{row} values: {', '.join(col_vals)}."
+
+        if chunk_type == "table_section":
+            sec = chunk.get("section_label", "").strip()
+            if sec:
+                return f"Section: {sec}."
+            return chunk["text"]
+
+        return chunk["text"]
+
+    except Exception:
+        return chunk.get("text", "")
+
+
 def compute_hallucination_rate(answer, retrieved, nli_model):
     """
     Fraction of answer sentences NOT entailed by the retrieved context.
@@ -54,7 +110,7 @@ def compute_hallucination_rate(answer, retrieved, nli_model):
     if not sentences:
         return 0.0
 
-    context = " ".join(r["text"] for r in retrieved)[:4500]
+    context = " ".join(_chunk_to_natural_language(r) for r in retrieved)[:4500]
     pairs = [(context, s) for s in sentences]
     scores = nli_model.predict(pairs)   # shape: (n_sentences, 3)
 

@@ -240,6 +240,48 @@ def _parse_adjudicator_verdict(text):
     return "REVISE", text
 
 
+def _regenerate_from_evidence(question, grounder_output, context, client, JUDGE_MODEL):
+    """
+    Regenerates a clean answer from the Grounder's verified SUPPORTED claims.
+    Used on the REVISE path instead of the adjudicator's own patched answer.
+    Returns (answer_text, latency, tokens).
+    """
+    facts = []
+    for line in grounder_output.splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("SUPPORTED:") and "— Evidence:" in stripped:
+            evidence = stripped.split("— Evidence:", 1)[1].strip().strip('"').strip("'")
+            if evidence:
+                facts.append(evidence)
+
+    if not facts:
+        return "Insufficient information.", 0.0, 0
+
+    numbered = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(facts))
+
+    prompt = f"""Answer the following question using ONLY these verified facts.
+
+Question:
+{question}
+
+Verified facts:
+{numbered}
+
+Full evidence (for reference):
+{context}
+
+Rules:
+- Use ONLY the verified facts and full evidence above.
+- Return ONLY the direct answer. No explanations, no reasoning.
+- If the question asks for multiple values, include all of them.
+
+Answer:
+""".strip()
+
+    out = ask_llm(prompt, client=client, model=JUDGE_MODEL, temperature=0.0, max_tokens=150)
+    return out["text"].strip(), out["latency"], out["tokens"]
+
+
 def _run_adjudicator(question, draft_answer, skeptic_output, grounder_output,
                      context, client, JUDGE_MODEL):
     """
@@ -340,12 +382,24 @@ def tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
     total_latency = round(tier1_result["latency"] + s_lat + g_lat + a_lat, 3)
     total_tokens  = tier1_result["tokens"] + s_tok + g_tok + a_tok
 
+    # --- Step 4: Regeneration (REVISE path only) ---
+    regenerated = False
+    if verdict == "REVISE":
+        regen_answer, r_lat, r_tok = _regenerate_from_evidence(
+            question, grounder_out, context, client, JUDGE_MODEL
+        )
+        final_answer = regen_answer
+        total_latency = round(total_latency + r_lat, 3)
+        total_tokens  = total_tokens + r_tok
+        regenerated = True
+
     return {
         "answer":              final_answer,
         "latency":             total_latency,
         "tokens":              total_tokens,
         "debate_triggered":    True,
         "adjudicator_verdict": verdict,          # "APPROVE" | "REVISE" | "ABSTAIN"
+        "regenerated":         regenerated,
         "gatekeeper_signals":  gate["signals"],
         "gatekeeper_score":    gate["gatekeeper_score"],
         "threshold":           gate["threshold"],
