@@ -39,7 +39,7 @@ def load_tatqa(filepath, max_samples=100):
                 samples.append({
                     "question": question,
                     "context": paragraph_context,
-                    "gold_answer": str(answer),
+                    "gold_answer": answer,
                     "answer_type": answer_type,
                     "doc_id": doc_id,
                     "table_chunks": table_chunks,

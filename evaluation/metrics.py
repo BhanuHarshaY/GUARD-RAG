@@ -15,6 +15,7 @@ def _split_sentences(text):
 def normalize_answer(s):
     s = str(s).lower().strip()
     s = re.sub(r'\b(a|an|the)\b', ' ', s)
+    s = re.sub(r'\b(million|billion|thousand|usd|eur|gbp)\b', '', s)
     preserve = {'.', ',', '-'}
     s = ''.join(ch for ch in s if ch not in string.punctuation or ch in preserve)
     s = re.sub(r'[$%]', '', s)
@@ -23,6 +24,8 @@ def normalize_answer(s):
 
 
 def compute_f1(prediction, ground_truth):
+    if isinstance(ground_truth, list):
+        return max((compute_f1(prediction, g) for g in ground_truth), default=0.0)
     pred_tokens = normalize_answer(prediction).split()
     gold_tokens = normalize_answer(ground_truth).split()
     common = Counter(pred_tokens) & Counter(gold_tokens)
@@ -35,6 +38,8 @@ def compute_f1(prediction, ground_truth):
 
 
 def compute_em(prediction, ground_truth):
+    if isinstance(ground_truth, list):
+        return max((compute_em(prediction, g) for g in ground_truth), default=0.0)
     return float(normalize_answer(prediction) == normalize_answer(ground_truth))
 
 
