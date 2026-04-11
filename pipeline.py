@@ -1,7 +1,7 @@
 from retrieval.retriever import retrieve
-from tiers.tier1 import tier1_basic_rag
-from tiers.tier2 import tier2_self_refine
-from tiers.tier3 import tier3_selective_debate
+from tiers.baseline import baseline_rag
+from tiers.refinement import refinement_rag
+from tiers.guardrag import guardrag_debate
 
 
 def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
@@ -44,30 +44,30 @@ def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
             f"{doc['text'][:160]}..."
         )
 
-    print(f"\n--- TIER 1: Basic RAG ---")
-    t1 = tier1_basic_rag(question, retrieved, client, BASE_MODEL)
-    print(f"Answer: {t1['answer']}")
-    print(f"Latency: {t1['latency']}s | Tokens: {t1['tokens']}")
+    print(f"\n--- BASELINE: Basic RAG ---")
+    b = baseline_rag(question, retrieved, client, BASE_MODEL)
+    print(f"Answer: {b['answer']}")
+    print(f"Latency: {b['latency']}s | Tokens: {b['tokens']}")
 
-    print(f"\n--- TIER 2: Self-Refine ---")
-    t2 = tier2_self_refine(question, retrieved, client, BASE_MODEL, tier1_result=t1)
-    print(f"Initial: {t2['initial_answer']}")
-    print(f"Final: {t2['answer']}")
-    print(f"Latency: {t2['latency']}s | Tokens: {t2['tokens']}")
+    print(f"\n--- REFINEMENT: Self-Consistency + Self-Refine ---")
+    r = refinement_rag(question, retrieved, client, BASE_MODEL, baseline_result=b)
+    print(f"Initial: {r['initial_answer']}")
+    print(f"Final: {r['answer']}")
+    print(f"Latency: {r['latency']}s | Tokens: {r['tokens']}")
 
-    print(f"\n--- TIER 3: Selective Debate ---")
-    t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1, nli_model=nli_model)
-    print(f"Debate triggered: {t3['debate_triggered']}")
-    print(f"Gatekeeper score: {t3.get('gatekeeper_score', 0.0):.3f} (threshold={t3.get('threshold', 0.20)})")
-    if t3.get("debate_triggered"):
-        print(f"Gatekeeper signals: {t3.get('gatekeeper_signals', [])}")
-        print(f"Adjudicator verdict: {t3.get('adjudicator_verdict', 'N/A')}")
-        transcript = t3.get("debate_transcript") or {}
+    print(f"\n--- GUARD-RAG: Selective Debate ---")
+    g = guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, baseline_result=b, nli_model=nli_model)
+    print(f"Debate triggered: {g['debate_triggered']}")
+    print(f"Gatekeeper score: {g.get('gatekeeper_score', 0.0):.3f} (threshold={g.get('threshold', 0.20)})")
+    if g.get("debate_triggered"):
+        print(f"Gatekeeper signals: {g.get('gatekeeper_signals', [])}")
+        print(f"Adjudicator verdict: {g.get('adjudicator_verdict', 'N/A')}")
+        transcript = g.get("debate_transcript") or {}
         if transcript.get("skeptic"):
             print(f"\n  [Skeptic]\n{transcript['skeptic']}")
         if transcript.get("grounder"):
             print(f"\n  [Grounder]\n{transcript['grounder']}")
-    print(f"\nAnswer: {t3['answer']}")
-    print(f"Latency: {t3['latency']}s | Tokens: {t3['tokens']}")
+    print(f"\nAnswer: {g['answer']}")
+    print(f"Latency: {g['latency']}s | Tokens: {g['tokens']}")
 
-    return t1, t2, t3
+    return b, r, g

@@ -12,20 +12,53 @@ def _split_sentences(text):
     return [p.strip() for p in parts if len(p.strip()) > 1]
 
 
+def _normalize_number(s):
+    """Try to parse s as a number and return a canonical string, else return None."""
+    try:
+        # remove commas, spaces
+        cleaned = re.sub(r'[,\s]', '', s)
+        val = float(cleaned)
+        # drop unnecessary trailing zeros: 42.0 → 42, 3.50 → 3.5
+        if val == int(val):
+            return str(int(val))
+        return f"{val:.10g}"
+    except (ValueError, OverflowError):
+        return None
+
+
 def normalize_answer(s):
     s = str(s).lower().strip()
-    s = re.sub(r'\b(a|an|the)\b', ' ', s)
+    # Strip footnote superscripts attached to words: "inflation2" → "inflation"
+    s = re.sub(r'([a-z])(\d+)\b', r'\1', s)
+    # Remove articles and approximation words
+    s = re.sub(r'\b(a|an|the|approximately|about|around|roughly|nearly)\b', ' ', s)
+    # Remove unit words
     s = re.sub(r'\b(million|billion|thousand|usd|eur|gbp)\b', '', s)
-    preserve = {'.', ',', '-'}
-    s = ''.join(ch for ch in s if ch not in string.punctuation or ch in preserve)
+    # Remove currency and percent symbols
     s = re.sub(r'[$%]', '', s)
+    # Normalize commas in numbers: "4,369" → "4369"
+    s = re.sub(r'(\d),(\d)', r'\1\2', s)
+    # Normalize negative: "(4369)" accounting format → "-4369"
+    s = re.sub(r'\((\d+\.?\d*)\)', r'-\1', s)
+    # Strip trailing % unit text
+    s = re.sub(r'\b(percent|pct)\b', '', s)
+    # Remove remaining punctuation except hyphen (keep hyphen for negative numbers)
+    preserve = {'-'}
+    s = ''.join(ch for ch in s if ch not in string.punctuation or ch in preserve)
     s = re.sub(r'\s+', ' ', s).strip()
+    # Canonicalize numeric strings: "42.0" → "42", "3.50" → "3.5"
+    num = _normalize_number(s)
+    if num is not None:
+        return num
     return s
 
 
 def compute_f1(prediction, ground_truth):
     if isinstance(ground_truth, list):
-        return max((compute_f1(prediction, g) for g in ground_truth), default=0.0)
+        # Try each element individually AND the full joined string
+        scores = [compute_f1(prediction, g) for g in ground_truth]
+        scores.append(compute_f1(prediction, " ".join(str(g) for g in ground_truth)))
+        return max(scores, default=0.0)
     pred_tokens = normalize_answer(prediction).split()
     gold_tokens = normalize_answer(ground_truth).split()
     common = Counter(pred_tokens) & Counter(gold_tokens)
@@ -39,7 +72,10 @@ def compute_f1(prediction, ground_truth):
 
 def compute_em(prediction, ground_truth):
     if isinstance(ground_truth, list):
-        return max((compute_em(prediction, g) for g in ground_truth), default=0.0)
+        # Try each element individually AND the full joined string
+        if max((compute_em(prediction, g) for g in ground_truth), default=0.0):
+            return 1.0
+        return compute_em(prediction, " ".join(str(g) for g in ground_truth))
     return float(normalize_answer(prediction) == normalize_answer(ground_truth))
 
 

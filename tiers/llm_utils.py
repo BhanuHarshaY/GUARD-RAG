@@ -4,7 +4,7 @@ import time
 
 def ask_llm(prompt, client, model, temperature=0.0, max_tokens=300):
     import time as _time
-    for attempt in range(8):
+    for attempt in range(12):
         try:
             start = _time.time()
             response = client.chat.completions.create(
@@ -33,12 +33,12 @@ def ask_llm(prompt, client, model, temperature=0.0, max_tokens=300):
                     secs = float(match.group(2))
                     wait = mins * 60 + secs + 2
                 else:
-                    wait = min(2 ** attempt * 5, 300)
+                    wait = min(2 ** attempt * 5, 600)
                 print(f"  Rate limited, waiting {wait:.0f}s...")
                 _time.sleep(wait)
             else:
                 raise
-    raise RuntimeError("Failed after 8 retries")
+    raise RuntimeError("Failed after 12 retries")
 
 
 def format_retrieved_context(retrieved, max_chars=3500):

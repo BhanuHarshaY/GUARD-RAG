@@ -5,11 +5,12 @@ from tqdm import tqdm
 def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
                  improved_index, improved_chunks, improved_metadata,
                  embed_model, client, BASE_MODEL, JUDGE_MODEL,
-                 mode="improved", max_samples=15, top_k=6, nli_model=None):
+                 mode="improved", max_samples=15, top_k=6, nli_model=None,
+                 guardrag_threshold=0.35, disabled_signals=None):
     from retrieval.retriever import retrieve
-    from tiers.tier1 import tier1_basic_rag
-    from tiers.tier2 import tier2_self_refine
-    from tiers.tier3 import tier3_selective_debate
+    from tiers.baseline import baseline_rag
+    from tiers.refinement import refinement_rag
+    from tiers.guardrag import guardrag_debate
     from evaluation.metrics import compute_f1, compute_em, compute_hallucination_rate
 
     if mode == "baseline":
@@ -28,36 +29,41 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
 
         retrieved = retrieve(question, current_index, current_chunks, current_metadata, embed_model, top_k=top_k)
 
-        t1 = tier1_basic_rag(question, retrieved, client, BASE_MODEL)
-        t2 = tier2_self_refine(question, retrieved, client, BASE_MODEL, tier1_result=t1)
-        t3 = tier3_selective_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, tier1_result=t1, nli_model=nli_model)
+        try:
+            b = baseline_rag(question, retrieved, client, BASE_MODEL)
+            r = refinement_rag(question, retrieved, client, BASE_MODEL, baseline_result=b)
+            g = guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, baseline_result=b, nli_model=nli_model, threshold=guardrag_threshold, disabled_signals=disabled_signals)
+        except RuntimeError as e:
+            print(f"\n  SKIPPED (rate limit exhausted): {question[:60]}")
+            continue
 
         records.append({
-            "question": question,
-            "gold_answer": gold,
-            "tier1_answer": t1["answer"],
-            "tier2_answer": t2["answer"],
-            "tier3_answer": t3["answer"],
-            "tier1_f1": compute_f1(t1["answer"], gold),
-            "tier2_f1": compute_f1(t2["answer"], gold),
-            "tier3_f1": compute_f1(t3["answer"], gold),
-            "tier1_em": compute_em(t1["answer"], gold),
-            "tier2_em": compute_em(t2["answer"], gold),
-            "tier3_em": compute_em(t3["answer"], gold),
-            "tier1_hallucination_rate": compute_hallucination_rate(t1["answer"], retrieved, nli_model),
-            "tier2_hallucination_rate": compute_hallucination_rate(t2["answer"], retrieved, nli_model),
-            "tier3_hallucination_rate": compute_hallucination_rate(t3["answer"], retrieved, nli_model),
-            "tier1_latency": t1["latency"],
-            "tier2_latency": t2["latency"],
-            "tier3_latency": t3["latency"],
-            "tier1_tokens": t1["tokens"],
-            "tier2_tokens": t2["tokens"],
-            "tier3_tokens": t3["tokens"],
-            "tier3_debate_triggered":    t3.get("debate_triggered", False),
-            "tier3_gatekeeper_score":    t3.get("gatekeeper_score", 0.0),
-            "tier3_threshold":           t3.get("threshold", 0.20),
-            "tier3_adjudicator_verdict": t3.get("adjudicator_verdict", None),
-            "mode": mode,
+            "question":                     question,
+            "gold_answer":                  gold,
+            "baseline_answer":              b["answer"],
+            "refinement_answer":            r["answer"],
+            "guardrag_answer":              g["answer"],
+            "baseline_f1":                  compute_f1(b["answer"], gold),
+            "refinement_f1":                compute_f1(r["answer"], gold),
+            "guardrag_f1":                  compute_f1(g["answer"], gold),
+            "baseline_em":                  compute_em(b["answer"], gold),
+            "refinement_em":                compute_em(r["answer"], gold),
+            "guardrag_em":                  compute_em(g["answer"], gold),
+            "baseline_hallucination_rate":  compute_hallucination_rate(b["answer"], retrieved, nli_model),
+            "refinement_hallucination_rate":compute_hallucination_rate(r["answer"], retrieved, nli_model),
+            "guardrag_hallucination_rate":  compute_hallucination_rate(g["answer"], retrieved, nli_model),
+            "baseline_latency":             b["latency"],
+            "refinement_latency":           r["latency"],
+            "guardrag_latency":             g["latency"],
+            "baseline_tokens":              b["tokens"],
+            "refinement_tokens":            r["tokens"],
+            "guardrag_tokens":              g["tokens"],
+            "guardrag_debate_triggered":    g.get("debate_triggered", False),
+            "guardrag_gatekeeper_score":    g.get("gatekeeper_score", 0.0),
+            "guardrag_gatekeeper_signals":  "|".join(g.get("gatekeeper_signals", [])),
+            "guardrag_threshold":           g.get("threshold", 0.35),
+            "guardrag_adjudicator_verdict": g.get("adjudicator_verdict", None),
+            "mode":                         mode,
         })
 
     return pd.DataFrame(records)
@@ -65,25 +71,25 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
 
 def summarize_results(df, label):
     return pd.DataFrame([{
-        "system": label,
-        "tier1_f1": df["tier1_f1"].mean(),
-        "tier2_f1": df["tier2_f1"].mean(),
-        "tier3_f1": df["tier3_f1"].mean(),
-        "tier1_em": df["tier1_em"].mean(),
-        "tier2_em": df["tier2_em"].mean(),
-        "tier3_em": df["tier3_em"].mean(),
-        "tier1_avg_tokens": df["tier1_tokens"].mean(),
-        "tier2_avg_tokens": df["tier2_tokens"].mean(),
-        "tier3_avg_tokens": df["tier3_tokens"].mean(),
-        "tier1_avg_latency": df["tier1_latency"].mean(),
-        "tier2_avg_latency": df["tier2_latency"].mean(),
-        "tier3_avg_latency": df["tier3_latency"].mean(),
-        "tier1_hallucination_rate":     df["tier1_hallucination_rate"].mean(),
-        "tier2_hallucination_rate":     df["tier2_hallucination_rate"].mean(),
-        "tier3_hallucination_rate":     df["tier3_hallucination_rate"].mean(),
-        "tier3_debate_rate":            df["tier3_debate_triggered"].mean(),
-        "tier3_avg_gatekeeper_score":   df["tier3_gatekeeper_score"].mean(),
-        "tier3_abstention_rate":        (df["tier3_adjudicator_verdict"] == "ABSTAIN").mean(),
-        "tier3_approve_rate":           (df["tier3_adjudicator_verdict"] == "APPROVE").mean(),
-        "tier3_revise_rate":            (df["tier3_adjudicator_verdict"] == "REVISE").mean(),
+        "system":                       label,
+        "baseline_f1":                  df["baseline_f1"].mean(),
+        "refinement_f1":                df["refinement_f1"].mean(),
+        "guardrag_f1":                  df["guardrag_f1"].mean(),
+        "baseline_em":                  df["baseline_em"].mean(),
+        "refinement_em":                df["refinement_em"].mean(),
+        "guardrag_em":                  df["guardrag_em"].mean(),
+        "baseline_avg_tokens":          df["baseline_tokens"].mean(),
+        "refinement_avg_tokens":        df["refinement_tokens"].mean(),
+        "guardrag_avg_tokens":          df["guardrag_tokens"].mean(),
+        "baseline_avg_latency":         df["baseline_latency"].mean(),
+        "refinement_avg_latency":       df["refinement_latency"].mean(),
+        "guardrag_avg_latency":         df["guardrag_latency"].mean(),
+        "baseline_hallucination_rate":  df["baseline_hallucination_rate"].mean(),
+        "refinement_hallucination_rate":df["refinement_hallucination_rate"].mean(),
+        "guardrag_hallucination_rate":  df["guardrag_hallucination_rate"].mean(),
+        "guardrag_debate_rate":         df["guardrag_debate_triggered"].mean(),
+        "guardrag_avg_gatekeeper_score":df["guardrag_gatekeeper_score"].mean(),
+        "guardrag_abstention_rate":     (df["guardrag_adjudicator_verdict"] == "ABSTAIN").mean(),
+        "guardrag_approve_rate":        (df["guardrag_adjudicator_verdict"] == "APPROVE").mean(),
+        "guardrag_revise_rate":         (df["guardrag_adjudicator_verdict"] == "REVISE").mean(),
     }])

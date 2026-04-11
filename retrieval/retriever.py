@@ -1,3 +1,4 @@
+import re
 import faiss
 import numpy as np
 
@@ -32,9 +33,25 @@ def question_is_list_like(question):
     return any(p in q for p in patterns)
 
 
+def extract_year_mentions(question):
+    """Return list of 4-digit years mentioned in the question."""
+    return re.findall(r"\b(19\d{2}|20\d{2})\b", question)
+
+
+def question_is_multispan(question):
+    """True if question asks for values across multiple years or uses 'respectively'."""
+    years = extract_year_mentions(question)
+    if len(set(years)) >= 2:
+        return True
+    q = question.lower()
+    return "respectively" in q or bool(re.search(r"\band\b.{1,40}\band\b", q))
+
+
 def rerank_candidates(query, candidates):
     reranked = []
     list_like = question_is_list_like(query)
+    multispan = question_is_multispan(query)
+    year_mentions = extract_year_mentions(query)
 
     for cand in candidates:
         score = cand["score"]
@@ -55,6 +72,15 @@ def rerank_candidates(query, candidates):
             score += 0.15
         if section_label and lexical_overlap_score(query, section_label) > 0:
             score += 0.15
+
+        # Multi-span boost: reward chunks whose header/text matches a mentioned year
+        if multispan and year_mentions:
+            col_header = cand.get("column_header") or ""
+            text = cand.get("text") or ""
+            for yr in year_mentions:
+                if yr in col_header or yr in text:
+                    score += 0.12
+                    break
 
         cand = dict(cand)
         cand["rerank_score"] = score
