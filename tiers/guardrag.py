@@ -240,7 +240,7 @@ Question:
 Evidence:
 {context}
 
-Draft answer (from Baseline):
+Draft answer (from Tier 2 Refinement):
 {draft_answer}
 
 Skeptic's challenged claims:

@@ -17,7 +17,7 @@ import random
 
 DATA_PATH = "data/tatqa_dataset_train.json"
 MAX_SAMPLES = 300
-EVAL_SAMPLES = 50
+EVAL_SAMPLES = 150
 TOP_K = 6
 RANDOM_SEED = 42
 

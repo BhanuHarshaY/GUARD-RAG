@@ -56,7 +56,7 @@ def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
     print(f"Latency: {r['latency']}s | Tokens: {r['tokens']}")
 
     print(f"\n--- GUARD-RAG: Selective Debate ---")
-    g = guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, baseline_result=b, nli_model=nli_model)
+    g = guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, baseline_result=r, nli_model=nli_model)
     print(f"Debate triggered: {g['debate_triggered']}")
     print(f"Gatekeeper score: {g.get('gatekeeper_score', 0.0):.3f} (threshold={g.get('threshold', 0.20)})")
     if g.get("debate_triggered"):
