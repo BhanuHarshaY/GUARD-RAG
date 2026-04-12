@@ -1,9 +1,32 @@
 import re
+import os
 
 from tiers.llm_utils import ask_llm, format_retrieved_context, strip_refinement_prefix
 from tiers.baseline import baseline_rag, is_arithmetic_question
 from indexing.table_parser import normalize_text_for_match
 from retrieval.retriever import question_is_list_like, question_is_multispan
+
+# ---------------------------------------------------------------------------
+# Optional: load DSPy-compiled adjudicator if available
+# ---------------------------------------------------------------------------
+_COMPILED_ADJUDICATOR = None
+_COMPILED_ADJ_PATH = "dspy_compiled_adjudicator.json"
+
+def _try_load_compiled_adjudicator():
+    global _COMPILED_ADJUDICATOR
+    if not os.path.exists(_COMPILED_ADJ_PATH):
+        return
+    try:
+        import dspy
+        from dspy_adjudicator import DSPyAdjudicator
+        adj = DSPyAdjudicator()
+        adj.load(_COMPILED_ADJ_PATH)
+        _COMPILED_ADJUDICATOR = adj
+        print(f"Loaded compiled DSPy adjudicator from {_COMPILED_ADJ_PATH}")
+    except Exception as e:
+        print(f"Warning: could not load compiled adjudicator ({e}), using default.")
+
+_try_load_compiled_adjudicator()
 
 # ---------------------------------------------------------------------------
 # Signal weights
@@ -13,7 +36,7 @@ SIGNAL_WEIGHTS = {
     "heuristic_missing_rows":      0.3,
     "heuristic_too_long":          0.2,
     "nli_low_grounding":           0.3,
-    "heuristic_arithmetic":        0.6,
+    "heuristic_arithmetic":        0.6,   # always triggers debate → PoT verification
     "heuristic_multispan":         0.5,
 }
 
@@ -184,7 +207,7 @@ def _verify_grounder_citations(grounder_output, context):
     return "\n".join(verified)
 
 
-def _run_grounder(question, draft_answer, skeptic_output, context, client, BASE_MODEL):
+def _run_grounder(question, draft_answer, skeptic_output, context, client, JUDGE_MODEL):
     prompt = f"""You are a Grounder defending a draft answer using ONLY the evidence provided.
 
 Question:
@@ -209,21 +232,51 @@ Output ONLY the per-claim verdicts. No extra commentary.
 Grounder verdicts:
 """.strip()
 
-    out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=400)
+    out = ask_llm(prompt, client=client, model=JUDGE_MODEL, temperature=0.0, max_tokens=400)
     raw = out["text"].strip()
     verified = _verify_grounder_citations(raw, context)
     return verified, out["latency"], out["tokens"]
 
 
 def _run_adjudicator(question, draft_answer, skeptic_output, grounder_output,
-                     context, client, JUDGE_MODEL):
+                     context, client, JUDGE_MODEL, pot_answer=None):
+    # Use DSPy-compiled adjudicator if available (better prompts via MIPROv2)
+    if _COMPILED_ADJUDICATOR is not None:
+        import time
+        t0 = time.time()
+        try:
+            pred = _COMPILED_ADJUDICATOR.forward(
+                question=question,
+                evidence=context,
+                draft_answer=draft_answer,
+                skeptic_output=skeptic_output,
+                grounder_output=grounder_output,
+            )
+            latency = round(time.time() - t0, 3)
+            raw = strip_refinement_prefix(pred.final_answer or "")
+            verdict, final_answer = "REVISE", raw
+            for label in ("APPROVE", "REVISE", "ABSTAIN"):
+                if raw.upper().startswith(f"[{label}]"):
+                    verdict = label
+                    final_answer = raw[len(f"[{label}]"):].strip()
+                    break
+            if "insufficient information" in final_answer.lower() and verdict == "REVISE":
+                verdict = "ABSTAIN"
+            return final_answer, verdict, latency, 0  # token count not available from DSPy
+        except Exception:
+            pass  # fall through to standard adjudicator
+
     is_arith = is_arithmetic_question(question)
     is_multi = question_is_multispan(question)
 
+    pot_section = ""
+    if pot_answer is not None:
+        pot_section = f"\nPython-verified answer (from code execution — treat as highly trusted): {pot_answer}\n"
+
     if is_arith:
-        answer_instructions = """- This question requires calculation. Recompute the answer independently from the evidence — do NOT just copy the draft.
-- Show your reasoning briefly, then state ONLY the final numeric result on the last line prefixed with 'Final answer:'
-- If your computed result matches the draft, use [APPROVE]. If different, use [REVISE] with your computed result."""
+        answer_instructions = """- This question requires calculation. If a Python-verified answer is provided above, trust it — use it as your answer unless it contradicts the evidence directly.
+- State ONLY the final numeric result on the last line prefixed with 'Final answer:'
+- If the Python answer matches the draft, use [APPROVE]. If different, use [REVISE] with the Python answer."""
     elif is_multi:
         answer_instructions = """- This question asks for values across multiple years or entities. Return ALL requested values in the same order asked.
 - Format: just the values separated by commas or newlines (e.g. "X, Y" or "X\nY"). Do NOT add year labels or headers.
@@ -239,7 +292,7 @@ Question:
 
 Evidence:
 {context}
-
+{pot_section}
 Draft answer (from Tier 2 Refinement):
 {draft_answer}
 
@@ -290,6 +343,7 @@ def guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
         baseline_result = baseline_rag(question, retrieved, client, BASE_MODEL)
 
     draft_answer = baseline_result["answer"]
+
     gate = gatekeeper_v4(question, retrieved, draft_answer,
                          nli_model=nli_model, threshold=threshold, disabled_signals=disabled_signals)
 
@@ -306,6 +360,15 @@ def guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
         }
 
     context = format_retrieved_context(retrieved, max_chars=4500)
+
+    # For arithmetic: run PoT with GPT-4o to get a trusted computed answer
+    # Pass it to the adjudicator as a signal — doesn't replace the debate
+    _pot_answer = None
+    _pot_lat = 0
+    _pot_tok = 0
+    if is_arithmetic_question(question):
+        from tiers.pot import pot_rag
+        _pot_answer, _pot_lat, _pot_tok = pot_rag(question, retrieved, client, JUDGE_MODEL)
 
     skeptic_out, s_lat, s_tok = _run_skeptic(
         question, draft_answer, context, client, BASE_MODEL,
@@ -326,7 +389,7 @@ def guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
         }
 
     grounder_out, g_lat, g_tok = _run_grounder(
-        question, draft_answer, skeptic_out, context, client, BASE_MODEL
+        question, draft_answer, skeptic_out, context, client, JUDGE_MODEL
     )
 
     # Run adjudicator if grounder conceded at least 1 claim
@@ -347,16 +410,16 @@ def guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
         }
 
     final_answer, verdict, a_lat, a_tok = _run_adjudicator(
-        question, draft_answer, skeptic_out, grounder_out, context, client, JUDGE_MODEL
+        question, draft_answer, skeptic_out, grounder_out, context, client, JUDGE_MODEL,
+        pot_answer=_pot_answer
     )
 
-    # If adjudicator approves, always return the original draft (refinement's answer)
-    # to avoid any reformatting or corruption introduced by the model output
+    # If adjudicator approves, return floor (Refinement) answer
     if verdict == "APPROVE":
         final_answer = draft_answer
 
-    total_latency = round(baseline_result["latency"] + s_lat + g_lat + a_lat, 3)
-    total_tokens  = baseline_result["tokens"] + s_tok + g_tok + a_tok
+    total_latency = round(baseline_result["latency"] + _pot_lat + s_lat + g_lat + a_lat, 3)
+    total_tokens  = baseline_result["tokens"] + _pot_tok + s_tok + g_tok + a_tok
 
     return {
         "answer":              final_answer,

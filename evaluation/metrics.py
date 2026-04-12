@@ -36,7 +36,7 @@ def normalize_answer(s):
     s = re.sub(r'\b(million|billion|thousand|usd|eur|gbp)\b', '', s)
     # Remove currency and percent symbols
     s = re.sub(r'[$%]', '', s)
-    # Normalize commas in numbers: "4,369" → "4369"
+    # Normalize commas in numbers: "4,369" → "4369" and "$7,252.50" → "7252.50"
     s = re.sub(r'(\d),(\d)', r'\1\2', s)
     # Normalize negative: "(4369)" accounting format → "-4369"
     s = re.sub(r'\((\d+\.?\d*)\)', r'-\1', s)

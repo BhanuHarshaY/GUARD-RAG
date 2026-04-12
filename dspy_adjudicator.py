@@ -86,7 +86,7 @@ def adjudicator_metric(example, prediction, trace=None):
 # Build training examples from evaluation_results.csv
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_examples(csv_path="evaluation_results.csv", max_train=40, max_dev=20):
+def build_examples(csv_path="evaluation_results.csv", max_train=None, max_dev=None):
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"{csv_path} not found — run run.py first")
 
@@ -96,6 +96,13 @@ def build_examples(csv_path="evaluation_results.csv", max_train=40, max_dev=20):
 
     if len(df) < 10:
         raise ValueError(f"Only {len(df)} debated samples — need at least 10")
+
+    # Auto-size train/dev split if not specified
+    n = len(df)
+    if max_train is None:
+        max_train = int(n * 0.75)
+    if max_dev is None:
+        max_dev = n - max_train
 
     random.seed(RANDOM_SEED)
     indices = list(range(len(df)))
@@ -127,10 +134,12 @@ def build_examples(csv_path="evaluation_results.csv", max_train=40, max_dev=20):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def compile_adjudicator():
-    from config import client
-    import os
-
+    from dotenv import load_dotenv
+    load_dotenv()
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not set")
+
     lm = dspy.LM(
         model="openai/gpt-4o",
         api_key=api_key,
@@ -141,6 +150,7 @@ def compile_adjudicator():
     dspy.configure(lm=lm)
 
     train_examples, dev_examples = build_examples()
+    print(f"  Using {len(train_examples)} train / {len(dev_examples)} dev examples")
 
     adjudicator = DSPyAdjudicator()
 
@@ -156,9 +166,9 @@ def compile_adjudicator():
         adjudicator,
         trainset=train_examples,
         valset=dev_examples,
-        num_trials=15,
-        max_bootstrapped_demos=3,
-        max_labeled_demos=4,
+        num_trials=10,
+        max_bootstrapped_demos=2,
+        max_labeled_demos=3,
     )
 
     compiled.save(COMPILED_PATH)

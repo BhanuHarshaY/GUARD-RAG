@@ -56,7 +56,7 @@ def baseline_rag(question, retrieved, client, BASE_MODEL):
     context = format_retrieved_context(retrieved)
 
     if is_arithmetic_question(question):
-        prompt = f"""You are answering a financial question that requires calculation.
+        prompt = f"""Answer the financial question using the evidence.
 
 Evidence:
 {context}
@@ -64,12 +64,9 @@ Evidence:
 Question:
 {question}
 
-Work through this carefully:
-Step 1 - Extract values: identify the exact numbers needed from the evidence.
-Step 2 - Calculate: show the arithmetic explicitly.
-Step 3 - Final answer: state ONLY the final numeric result. No units, no formula, no explanation — just the number.
+Answer with only the final number. No explanation.
 
-Final answer:""".strip()
+Answer:""".strip()
     else:
         prompt = f"""You are answering a question using ONLY the provided evidence.
 
