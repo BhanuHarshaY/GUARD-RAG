@@ -101,8 +101,8 @@ def run_collect():
     from data.loader import load_tatqa
     from indexing.vector_store import build_vector_store
     from retrieval.retriever import retrieve
-    from tiers.tier1 import tier1_basic_rag
-    from tiers.tier3 import gatekeeper_v4
+    from tiers.baseline import baseline_rag
+    from tiers.guardrag import gatekeeper_v4
     from tiers.llm_utils import ask_llm, strip_refinement_prefix, format_retrieved_context
     from evaluation.metrics import compute_f1
 
@@ -162,7 +162,7 @@ Final answer:
         gold       = sample["gold_answer"]
 
         retrieved  = retrieve(question, index, chunks, metadata, embed_model, top_k=TOP_K)
-        t1         = tier1_basic_rag(question, retrieved, client, BASE_MODEL)
+        t1         = baseline_rag(question, retrieved, client, BASE_MODEL)
         tier1_ans  = t1["answer"]
         tier1_tok  = t1["tokens"]
 
@@ -261,7 +261,7 @@ def run_sweep():
     print("SIGNAL ABLATION  (at recommended threshold)")
     print("─" * 60)
 
-    from tiers.tier3 import SIGNAL_WEIGHTS
+    from tiers.guardrag import SIGNAL_WEIGHTS
 
     # baseline metrics at recommended threshold
     baseline_row = _sweep_row(df, rec_threshold)

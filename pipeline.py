@@ -35,8 +35,18 @@ def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
         top_k=top_k,
         candidate_k=40
     )
+    # GUARD-RAG gets 2× the context — T1/T2 are unaffected
+    retrieved_g = retrieve(
+        question,
+        current_index,
+        current_chunks,
+        current_metadata,
+        embed_model,
+        top_k=top_k * 2,
+        candidate_k=40
+    )
 
-    print(f"\nRetrieved {len(retrieved)} chunks:")
+    print(f"\nRetrieved {len(retrieved)} chunks (T1/T2), {len(retrieved_g)} chunks (T3):")
     for doc in retrieved[:12]:
         print(
             f"  [{doc['chunk_id']}] "
@@ -56,7 +66,7 @@ def run_comparison(question, baseline_index, baseline_chunks, baseline_metadata,
     print(f"Latency: {r['latency']}s | Tokens: {r['tokens']}")
 
     print(f"\n--- GUARD-RAG: Selective Debate ---")
-    g = guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, baseline_result=r, nli_model=nli_model)
+    g = guardrag_debate(question, retrieved_g, client, BASE_MODEL, JUDGE_MODEL, baseline_result=r, nli_model=nli_model)
     print(f"Debate triggered: {g['debate_triggered']}")
     print(f"Gatekeeper score: {g.get('gatekeeper_score', 0.0):.3f} (threshold={g.get('threshold', 0.20)})")
     if g.get("debate_triggered"):

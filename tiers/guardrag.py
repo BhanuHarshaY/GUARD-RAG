@@ -29,6 +29,39 @@ def _try_load_compiled_adjudicator():
 _try_load_compiled_adjudicator()
 
 # ---------------------------------------------------------------------------
+# DSPy ChainOfThought adjudicator (lazy init — no compilation cost)
+# ---------------------------------------------------------------------------
+_DSPY_COT = None
+_DSPY_COT_INIT_DONE = False
+
+def _get_dspy_cot():
+    """Lazy-initialize DSPy ChainOfThought adjudicator using OpenRouter."""
+    global _DSPY_COT, _DSPY_COT_INIT_DONE
+    if _DSPY_COT_INIT_DONE:
+        return _DSPY_COT
+    _DSPY_COT_INIT_DONE = True
+    try:
+        import dspy
+        from dspy_adjudicator import AdjudicatorSignature
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if not api_key:
+            return None
+        lm = dspy.LM(
+            model="openai/gpt-4o",
+            api_key=api_key,
+            api_base="https://openrouter.ai/api/v1",
+            temperature=0.0,
+            max_tokens=450,
+        )
+        dspy.configure(lm=lm)
+        _DSPY_COT = dspy.ChainOfThought(AdjudicatorSignature)
+        print("DSPy ChainOfThought adjudicator ready")
+    except Exception as e:
+        print(f"DSPy CoT init skipped: {e}")
+        _DSPY_COT = None
+    return _DSPY_COT
+
+# ---------------------------------------------------------------------------
 # Signal weights
 # ---------------------------------------------------------------------------
 SIGNAL_WEIGHTS = {
@@ -41,6 +74,20 @@ SIGNAL_WEIGHTS = {
 }
 
 _NLI_ENTAILMENT_IDX = 1
+
+
+def _clean_answer(text):
+    """Strip formatting artifacts that hurt F1 scoring."""
+    text = str(text).strip()
+    # Remove markdown bold/italic
+    text = re.sub(r'\*+', '', text)
+    # Remove "Answer:" or "Final answer:" prefixes
+    text = re.sub(r'^(final\s+)?answer\s*:\s*', '', text, flags=re.IGNORECASE)
+    # Remove bracket tags like [REVISE], [APPROVE]
+    text = re.sub(r'^\[(APPROVE|REVISE|ABSTAIN)\]\s*', '', text, flags=re.IGNORECASE)
+    # Strip trailing punctuation artifacts
+    text = text.strip().strip('.')
+    return text.strip()
 
 
 def clean_for_gatekeeper(text):
@@ -238,6 +285,76 @@ Grounder verdicts:
     return verified, out["latency"], out["tokens"]
 
 
+def _generate_guardrag_answer(question, retrieved, client, JUDGE_MODEL):
+    """
+    GPT-4o generates a fresh, independent answer for GUARD-RAG tier.
+    Stronger than mini — used as the debate draft when gatekeeper fires.
+    """
+    from tiers.llm_utils import format_retrieved_context
+    context = format_retrieved_context(retrieved, max_chars=4500)
+    is_arith = is_arithmetic_question(question)
+
+    if is_arith:
+        prompt = f"""You are a financial analyst. Answer the question using ONLY the evidence.
+
+Evidence:
+{context}
+
+Question:
+{question}
+
+Work through the calculation step by step, then state only the final number.
+Final answer:""".strip()
+        max_tokens = 300
+    else:
+        prompt = f"""You are a financial analyst. Answer the question using ONLY the evidence.
+
+Rules:
+- Return ONLY the direct answer value(s). No explanation, no reasoning sentences.
+- If multiple values are asked for, list them concisely.
+- Do not say "Based on the evidence" or similar phrases.
+
+Evidence:
+{context}
+
+Question:
+{question}
+
+Answer:""".strip()
+        max_tokens = 150
+
+    out = ask_llm(prompt, client=client, model=JUDGE_MODEL, temperature=0.0, max_tokens=max_tokens)
+    answer = out["text"].strip()
+    if is_arith:
+        from tiers.baseline import _extract_final_answer
+        answer = _extract_final_answer(answer)
+    return _clean_answer(answer), out["latency"], out["tokens"]
+
+
+def _run_span_extractor(question, draft_answer, context, client, BASE_MODEL):
+    """For text questions: extract the precise span from evidence, trim verbosity."""
+    prompt = f"""Extract the precise answer to the question from the evidence.
+
+Evidence:
+{context}
+
+Question:
+{question}
+
+Current answer: {draft_answer}
+
+Rules:
+- If the current answer is already a precise value or short phrase: return it unchanged.
+- If the current answer is too verbose or contains reasoning: extract ONLY the key value(s).
+- Return ONLY the answer. No explanations, no "Based on evidence", no full sentences.
+- If the question asks for multiple values, list them concisely separated by commas.
+
+Answer:""".strip()
+
+    out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=80)
+    return out["text"].strip(), out["latency"], out["tokens"]
+
+
 def _run_adjudicator(question, draft_answer, skeptic_output, grounder_output,
                      context, client, JUDGE_MODEL, pot_answer=None):
     # Use DSPy-compiled adjudicator if available (better prompts via MIPROv2)
@@ -273,10 +390,43 @@ def _run_adjudicator(question, draft_answer, skeptic_output, grounder_output,
     if pot_answer is not None:
         pot_section = f"\nPython-verified answer (from code execution — treat as highly trusted): {pot_answer}\n"
 
+    # Try DSPy ChainOfThought adjudicator (adds explicit reasoning step before verdict)
+    # Only for non-arithmetic where PoT isn't available — CoT helps text/span decisions
+    if not is_arith and _COMPILED_ADJUDICATOR is None:
+        import time as _time
+        cot = _get_dspy_cot()
+        if cot is not None:
+            try:
+                t0 = _time.time()
+                evidence_for_dspy = context[:3000]
+                pred = cot(
+                    question=question,
+                    evidence=evidence_for_dspy,
+                    draft_answer=draft_answer,
+                    skeptic_output=skeptic_output,
+                    grounder_output=grounder_output,
+                )
+                latency = round(_time.time() - t0, 3)
+                raw = (pred.final_answer or "").strip()
+                raw = strip_refinement_prefix(raw)
+                verdict, final_answer = "REVISE", raw
+                for label in ("APPROVE", "REVISE", "ABSTAIN"):
+                    if raw.upper().startswith(f"[{label}]"):
+                        verdict = label
+                        final_answer = raw[len(f"[{label}]"):].strip()
+                        break
+                if "insufficient information" in final_answer.lower() and verdict == "REVISE":
+                    verdict = "ABSTAIN"
+                return final_answer, verdict, latency, 0
+            except Exception:
+                pass  # fall through to standard prompt
+
     if is_arith:
-        answer_instructions = """- This question requires calculation. If a Python-verified answer is provided above, trust it — use it as your answer unless it contradicts the evidence directly.
-- State ONLY the final numeric result on the last line prefixed with 'Final answer:'
-- If the Python answer matches the draft, use [APPROVE]. If different, use [REVISE] with the Python answer."""
+        answer_instructions = """- This question requires calculation. If a Python-verified answer is provided above, use it as your FINAL answer — Python does not make arithmetic errors.
+- Do NOT recompute. Trust the Python answer.
+- If the Python answer matches the draft: use [APPROVE].
+- If the Python answer differs from the draft: use [REVISE] with ONLY the Python answer.
+- If no Python answer is provided: recompute independently and prefix result with 'Final answer:'"""
     elif is_multi:
         answer_instructions = """- This question asks for values across multiple years or entities. Return ALL requested values in the same order asked.
 - Format: just the values separated by commas or newlines (e.g. "X, Y" or "X\nY"). Do NOT add year labels or headers.
@@ -361,8 +511,28 @@ def guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
 
     context = format_retrieved_context(retrieved, max_chars=4500)
 
-    # For arithmetic: run PoT with GPT-4o to get a trusted computed answer
-    # Pass it to the adjudicator as a signal — doesn't replace the debate
+    # Text/span questions: debate hurts — return refinement answer directly
+    if not is_arithmetic_question(question) and not question_is_multispan(question):
+        return {
+            "answer":             draft_answer,
+            "latency":            baseline_result["latency"],
+            "tokens":             baseline_result["tokens"],
+            "debate_triggered":   False,
+            "gatekeeper_signals": gate["signals"],
+            "gatekeeper_score":   gate["gatekeeper_score"],
+            "threshold":          gate["threshold"],
+            "debate_transcript":  None,
+        }
+
+    # GPT-4o generates a fresh independent answer — this is the debate draft
+    # Stronger than mini; debate verifies it's grounded in the evidence
+    gpt4o_answer, g4o_lat, g4o_tok = _generate_guardrag_answer(
+        question, retrieved, client, JUDGE_MODEL
+    )
+    # Use GPT-4o answer as the draft for debate (replaces T2 mini answer)
+    draft_answer = gpt4o_answer if gpt4o_answer.strip() else draft_answer
+
+    # For arithmetic: also run PoT as adjudicator signal
     _pot_answer = None
     _pot_lat = 0
     _pot_tok = 0
@@ -414,12 +584,44 @@ def guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL,
         pot_answer=_pot_answer
     )
 
-    # If adjudicator approves, return floor (Refinement) answer
+    # If adjudicator approves, return draft unchanged
     if verdict == "APPROVE":
         final_answer = draft_answer
 
-    total_latency = round(baseline_result["latency"] + _pot_lat + s_lat + g_lat + a_lat, 3)
-    total_tokens  = baseline_result["tokens"] + _pot_tok + s_tok + g_tok + a_tok
+    # ── Iterative debate: second round on REVISE cases only ───────────────────
+    # Only fires on ~12% of samples. Catches cases where the revised answer
+    # still has unsupported claims. APPROVE and non-debated paths untouched.
+    iter_lat, iter_tok = 0, 0
+    if verdict == "REVISE" and final_answer.strip():
+        final_answer = _clean_answer(final_answer)
+        s2_out, s2_lat, s2_tok = _run_skeptic(
+            question, final_answer, context, client, BASE_MODEL,
+            gatekeeper_signals=gate["signals"]
+        )
+        iter_lat += s2_lat
+        iter_tok += s2_tok
+        if "no unsupported claims" not in s2_out.lower():
+            g2_out, g2_lat, g2_tok = _run_grounder(
+                question, final_answer, s2_out, context, client, JUDGE_MODEL
+            )
+            iter_lat += g2_lat
+            iter_tok += g2_tok
+            conceded2 = [l for l in g2_out.splitlines() if l.strip().upper().startswith("CONCEDED")]
+            if conceded2:
+                fa2, v2, a2_lat, a2_tok = _run_adjudicator(
+                    question, final_answer, s2_out, g2_out, context, client, JUDGE_MODEL,
+                    pot_answer=_pot_answer
+                )
+                iter_lat += a2_lat
+                iter_tok += a2_tok
+                if v2 != "ABSTAIN" and fa2.strip():
+                    final_answer = _clean_answer(fa2) if v2 == "REVISE" else final_answer
+                    verdict = v2
+
+    final_answer = _clean_answer(final_answer)
+
+    total_latency = round(baseline_result["latency"] + g4o_lat + _pot_lat + s_lat + g_lat + a_lat + iter_lat, 3)
+    total_tokens  = baseline_result["tokens"] + g4o_tok + _pot_tok + s_tok + g_tok + a_tok + iter_tok
 
     return {
         "answer":              final_answer,

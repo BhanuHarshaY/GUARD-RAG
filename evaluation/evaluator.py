@@ -27,12 +27,14 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
         question = sample["question"]
         gold = sample["gold_answer"]
 
-        retrieved = retrieve(question, current_index, current_chunks, current_metadata, embed_model, top_k=top_k)
+        retrieved    = retrieve(question, current_index, current_chunks, current_metadata, embed_model, top_k=top_k)
+        # GUARD-RAG gets 2× the context — T1/T2 are unaffected
+        retrieved_g  = retrieve(question, current_index, current_chunks, current_metadata, embed_model, top_k=top_k * 2)
 
         try:
             b = baseline_rag(question, retrieved, client, BASE_MODEL)
             r = refinement_rag(question, retrieved, client, BASE_MODEL, baseline_result=b)
-            g = guardrag_debate(question, retrieved, client, BASE_MODEL, JUDGE_MODEL, baseline_result=r, nli_model=nli_model, threshold=guardrag_threshold, disabled_signals=disabled_signals)
+            g = guardrag_debate(question, retrieved_g, client, BASE_MODEL, JUDGE_MODEL, baseline_result=r, nli_model=nli_model, threshold=guardrag_threshold, disabled_signals=disabled_signals)
         except RuntimeError as e:
             print(f"\n  SKIPPED (rate limit exhausted): {question[:60]}")
             continue

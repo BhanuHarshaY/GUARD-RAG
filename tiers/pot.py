@@ -14,12 +14,7 @@ import contextlib
 
 POT_PROMPT = """You are a financial analyst. Solve this step by step.
 
-The evidence is formatted as table rows like:
-  [id] Section: X | Row: LABEL | Column: YEAR | Value: NUMBER ; Column: YEAR | Value: NUMBER
-  [id] Section: X | Row: LABEL | Column: YEAR | Value: NUMBER  (single column)
-  [id] TEXT PASSAGE (narrative text)
-
-Evidence:
+Evidence (structured key-value facts):
 {context}
 
 Question:
@@ -109,6 +104,37 @@ def _normalize_result(result_str):
         return result_str.strip()
 
 
+def extract_structured_facts(retrieved):
+    """
+    Convert retrieved chunks into clean key-value facts for PoT.
+    Table cells → "Row (Column): Value" — eliminates pipe-delimited noise.
+    Text chunks → raw text (truncated).
+    """
+    facts = []
+    seen = set()
+    for chunk in retrieved:
+        ctype = chunk.get("chunk_type", "text")
+        if ctype == "table_cell":
+            row = (chunk.get("row_label") or "").strip()
+            col = (chunk.get("column_header") or "").strip()
+            val = (chunk.get("value") or "").strip()
+            sec = (chunk.get("section_label") or "").strip()
+            if row and col and val:
+                key = f"{row}||{col}"
+                if key not in seen:
+                    seen.add(key)
+                    label = f"{row} [{sec}]" if sec else row
+                    facts.append(f"{label} ({col}): {val}")
+        elif ctype in ("table_row", "table_section"):
+            pass  # table_cell captures same data more cleanly
+        else:
+            text = chunk.get("text", "").strip()[:300]
+            if text and text not in seen:
+                seen.add(text)
+                facts.append(text)
+    return "\n".join(facts[:35])
+
+
 def pot_rag(question, retrieved, client, BASE_MODEL):
     """
     Program-of-Thought arithmetic solver.
@@ -116,9 +142,9 @@ def pot_rag(question, retrieved, client, BASE_MODEL):
     Returns:
         (answer_str, latency, tokens) — answer is None if code fails to execute.
     """
-    from tiers.llm_utils import ask_llm, format_retrieved_context
+    from tiers.llm_utils import ask_llm
 
-    context = format_retrieved_context(retrieved, max_chars=3000)
+    context = extract_structured_facts(retrieved)
     prompt = POT_PROMPT.format(context=context, question=question)
 
     out = ask_llm(prompt, client=client, model=BASE_MODEL, temperature=0.0, max_tokens=500)
