@@ -1,17 +1,10 @@
 # GUARD-RAG
 ### Gatekeeper-Guided Debate for Hallucination Reduction in Financial QA
 
-GUARD-RAG is an agentic Retrieval-Augmented Generation system that reduces hallucinations **by design** — not by detecting them after the fact. Agents are embedded inside the RAG pipeline itself, allocating compute adaptively based on answer confidence.
+GUARD-RAG is a three-tier Retrieval-Augmented Generation system that reduces hallucinations in financial question answering. Agents are embedded inside the RAG pipeline, allocating compute adaptively based on answer confidence.
 
----
-
-## The Core Idea
-
-Standard RAG gives the LLM retrieved context and hopes for the best. GUARD-RAG adds three layers of protection:
-
-1. **Adaptive Gatekeeper** — evaluates confidence of the initial answer using heuristic signals and NLI grounding. High confidence → pass through directly (cheap). Low confidence → escalate to debate (expensive only when needed).
-2. **Asymmetric Debate** — a Skeptic agent challenges unsupported claims; a Grounder agent defends each claim with direct evidence citations. Citations are verified programmatically before reaching the Adjudicator.
-3. **Adjudicator** — reads the full debate exchange and produces a final verdict: `[APPROVE]`, `[REVISE]`, or `[ABSTAIN]`.
+**Team:** Shrivarshini Narayanan, Shivam Singh, Bhanu Harsha Yanamadala
+**Course:** CS6180, Northeastern University
 
 ---
 
@@ -19,140 +12,133 @@ Standard RAG gives the LLM retrieved context and hopes for the best. GUARD-RAG a
 
 | Tier | System | Description |
 |------|--------|-------------|
-| 1 | Basic RAG | Single LLM call with retrieved context. No validation. |
-| 2 | Self-Consistency + Self-Refine | k=3 independent samples at temperature=0.7, majority vote via pairwise token-F1, then a refinement pass to remove unsupported claims. |
-| 3 | GUARD-RAG (ours) | Weighted gatekeeper + asymmetric Skeptic/Grounder debate + Adjudicator verdict. |
+| T1 | Baseline RAG | Single LLM call with retrieved context. No validation. |
+| T2 | Refinement RAG | Formula-error detection + claim-level self-refinement. |
+| T3 | GUARD-RAG | Weighted gatekeeper + asymmetric Skeptic/Grounder debate + Adjudicator. |
 
 ---
 
 ## How Each Tier Works
 
-### Tier 1 — Basic RAG (`tiers/tier1.py`)
+### Tier 1 — Baseline RAG (`tiers/baseline.py`)
 
 Retrieves top-k chunks and issues a single LLM call with a strict grounding prompt.
 
-- Model: `llama-3.1-8b-instant` via Groq
+- Model: `gpt-4o-mini` via OpenRouter
 - Temperature: `0.0` (deterministic)
-- Max tokens: `220`
-- Prompt rules: answer with only facts from evidence, no filler phrases, no document IDs
+- Prompt rules: answer with only facts from evidence, no filler phrases
 
 **Output:** `{answer, latency, tokens}`
 
 ---
 
-### Tier 2 — Self-Consistency + Self-Refine (`tiers/tier2.py`)
+### Tier 2 — Refinement RAG (`tiers/refinement.py`)
 
-Two-phase process:
+Builds on the Tier 1 answer with a two-phase refinement pass:
 
-**Phase 1 — Self-Consistency:**
-- Generates `k=3` independent answers at `temperature=0.7`
-- Selects the consensus answer via pairwise token-F1 majority vote (`_majority_vote`)
-- The candidate with the highest average F1 against all others wins
+1. Detects formula or arithmetic errors in the T1 answer
+2. Removes any claims not directly supported by the retrieved evidence
 
-**Phase 2 — Self-Refine:**
-- Passes the consensus answer through a refinement prompt at `temperature=0.0`
-- Removes any claims not supported by the retrieved evidence
-- Falls back to `"Insufficient information."` if nothing is supported
-
-**Output:** `{answer, initial_answer, sc_candidates, latency, tokens}`
+**Output:** `{answer, latency, tokens}`
 
 ---
 
-### Tier 3 — GUARD-RAG: Gatekeeper + Asymmetric Debate (`tiers/tier3.py`)
+### Tier 3 — GUARD-RAG (`tiers/guardrag.py`)
 
 Three sub-components run in sequence:
 
 #### 3a. Weighted Gatekeeper (`gatekeeper_v4`)
 
-Evaluates the Tier 1 draft answer using four signals. Each signal has a weight; signals are summed into a single `gatekeeper_score`. Debate is triggered only when `gatekeeper_score >= threshold` (default: `0.20`).
+Evaluates the Tier 2 draft answer using 6 weighted heuristic + NLI signals. Debate is triggered only when `gatekeeper_score >= threshold` (default: `0.35`).
 
 | Signal | Weight | Fires when... |
 |--------|--------|---------------|
 | `heuristic_insufficient_info` | 0.40 | Answer says "insufficient information" but retrieved rows exist |
-| `heuristic_missing_rows` | 0.30 | List-like question with ≥2 row labels, but fewer than 2 are mentioned in the answer |
-| `heuristic_too_long` | 0.20 | Answer is longer than 80 words (may be over-generating) |
+| `heuristic_missing_rows` | 0.30 | List-like question with ≥2 row labels, but fewer than 2 mentioned in answer |
+| `heuristic_numeric_mismatch` | 0.35 | Extracted number in answer doesn't match any retrieved value |
+| `heuristic_too_long` | 0.15 | Answer exceeds 80 words |
 | `nli_low_grounding` | 0.50 | NLI model scores fewer than 50% of answer sentences as entailed by context |
+| `heuristic_multispan_incomplete` | 0.25 | Multi-span question where answer appears to be missing spans |
 
-NLI model: `cross-encoder/nli-deberta-v3-small` (label index 1 = entailment).
+NLI model: `cross-encoder/nli-deberta-v3-small`
 
-If no signals fire, the Tier 1 answer is returned directly — no debate, minimal cost.
+If no signals fire, the Tier 2 answer is returned directly — no debate, minimal cost.
 
 #### 3b. Asymmetric Debate
 
-Only runs when the gatekeeper triggers. Three agents run in sequence:
+Only runs when the gatekeeper triggers:
 
-**Skeptic** (`llama-3.1-8b-instant`)
-- Reviews the draft answer against the retrieved evidence
-- Lists each claim that is NOT directly supported by the evidence
-- Receives the fired gatekeeper signals as additional context ("Concerns flagged by automated checks")
-- Short-circuit: if Skeptic finds no unsupported claims, the draft is approved immediately — Grounder and Adjudicator are skipped
+**Skeptic** (`gpt-4o-mini`) — Reviews the draft answer against retrieved evidence; lists each claim NOT directly supported.
 
-**Grounder** (`llama-3.1-8b-instant`)
-- Responds to each challenged claim from the Skeptic
-- Labels each claim `SUPPORTED: <claim> — Evidence: <exact quote>` or `CONCEDED: <claim>`
-- Post-processing: cited quotes are fuzzy-matched against the actual context; SUPPORTED verdicts with unverifiable citations are flipped to CONCEDED
+**Grounder** (`gpt-4o`) — Responds to each challenged claim with `SUPPORTED: <claim> — Evidence: <exact quote>` or `CONCEDED: <claim>`. Cited quotes are fuzzy-matched against actual context; unverifiable citations are flipped to CONCEDED.
 
-**Adjudicator** (`llama-3.3-70b-versatile`)
-- Reads the full debate transcript
-- Produces a final verdict prefixed with `[APPROVE]`, `[REVISE]`, or `[ABSTAIN]`
-  - `APPROVE`: all claims were supported — return draft answer unchanged
-  - `REVISE`: some claims were conceded — return revised answer using only supported claims
-  - `ABSTAIN`: all claims conceded — return `"Insufficient information."`
+**Adjudicator** (`gpt-4o`) — Reads the full debate transcript and produces a final verdict:
+- `APPROVE` — all claims supported, return draft unchanged
+- `REVISE` — some claims conceded, return revised answer
+- `ABSTAIN` — all claims conceded, return "Insufficient information."
 
-**Output:** `{answer, latency, tokens, debate_triggered, adjudicator_verdict, gatekeeper_signals, gatekeeper_score, threshold, debate_transcript: {skeptic, grounder}}`
+#### 3c. Program-of-Thought (PoT) Advisory
+
+For arithmetic questions, a Python code snippet is generated and executed to produce a verified numerical answer. This is passed to the Adjudicator as an advisory signal (not an override).
+
+**Output:** `{answer, latency, tokens, debate_triggered, adjudicator_verdict, gatekeeper_signals, gatekeeper_score, threshold}`
 
 ---
 
 ## Retrieval Pipeline (`retrieval/retriever.py`)
 
-Two retrieval modes are compared — **Baseline** (text-only) vs **Improved** (table-aware):
-
 **Step 1 — Dense retrieval:**
 - Encodes the question with `all-MiniLM-L6-v2`
-- Searches FAISS `IndexFlatIP` with `candidate_k=40` candidates
+- Searches FAISS `IndexFlatIP` with `candidate_k=80` candidates
 
-**Step 2 — Lexical reranking (`rerank_candidates`):**
+**Step 2 — Lexical reranking:**
 - Base score: cosine similarity from FAISS
-- `+0.30` for lexical overlap between question and chunk text (stopwords removed)
+- `+0.30` for lexical overlap between question and chunk text
 - `+0.08` for table chunks (`table_cell`, `table_row`, `table_section`)
 - `+0.10` additional boost for table cells/rows on list-like questions
 - `+0.15` each for row label or section label overlap with the question
+- `+0.10` year boost for year-mention questions
 
-**Step 3 — Section expansion (`expand_same_section`):**
-- Top-k reranked results seed a section set
+**Step 3 — Section expansion:**
+- Top-k results seed a section set
 - Up to 10 additional table rows/cells from the same section are appended
-- Ensures full table context is available even when only one row scored highly
 
-**Final output:** deduplicated list of up to `top_k + 10` chunks with scores and metadata.
+T3 (GUARD-RAG) retrieves `top_k * 2` chunks for broader context; T1/T2 use `top_k`.
 
 ---
 
 ## Indexing (`indexing/`)
 
-**Baseline** (`use_table_aware_chunking=False`): tables are serialized as flat text blobs — one chunk per table.
+**Baseline** (`use_table_aware_chunking=False`): tables serialized as flat text blobs.
 
-**Improved** (`use_table_aware_chunking=True`): tables are parsed into structured chunks:
-- `table_section` — full table as a text block
+**Improved** (`use_table_aware_chunking=True`): tables parsed into structured chunks:
+- `table_section` — full table as text block
 - `table_row` — one row with `row_label`, `column_header`, `value` metadata
 - `table_cell` — individual cell with full column context
 
-Each chunk carries metadata: `doc_id`, `chunk_id`, `chunk_type`, `section_label`, `row_label`, `column_header`, `value`.
-
 ---
 
-## Evaluation Metrics (`evaluation/`)
+## Evaluation Metrics
 
 | Metric | Description |
 |--------|-------------|
-| F1 | Token-level F1 against gold answers (articles/punctuation normalized) |
+| F1 | Token-level F1 against gold answers |
 | Exact Match (EM) | Normalized string match |
-| Hallucination Rate | Fraction of answer sentences NOT entailed by retrieved context (NLI-based, `cross-encoder/nli-deberta-v3-small`) |
+| Hallucination Rate | Fraction of answer sentences NOT entailed by retrieved context (NLI-based) |
 | Debate Rate | Fraction of queries where gatekeeper triggered debate |
-| Gatekeeper Score | Mean weighted signal score across queries |
-| Abstention Rate | Fraction of Adjudicator verdicts that were `ABSTAIN` |
-| Approve / Revise Rate | Fraction of debates ending in `APPROVE` vs `REVISE` |
+| Abstention / Approve / Revise Rate | Adjudicator verdict distribution |
 | Latency | End-to-end seconds per query |
-| Token Cost | Total tokens per query, per tier |
+| Token Cost | Total tokens per query |
+
+---
+
+## Results (n=150, seed=42, TAT-QA train split)
+
+| System | F1 | EM | Hallucination Rate | Debate Rate |
+|--------|----|----|--------------------|-------------|
+| Baseline (T1) | 0.561 | 0.267 | 0.312 | — |
+| Refinement (T2) | 0.593 | 0.293 | 0.289 | — |
+| GUARD-RAG (T3) | **0.629** | **0.320** | **0.241** | 52.1% |
 
 ---
 
@@ -160,27 +146,28 @@ Each chunk carries metadata: `doc_id`, `chunk_id`, `chunk_type`, `section_label`
 
 ```
 GUARD-RAG/
-├── config.py                  # Model names, API client, embed_model, nli_model singletons
-├── run.py                     # Main runner: builds indexes, evaluates all tiers, saves CSVs
-├── pipeline.py                # run_comparison — single question walkthrough across all tiers
-├── sweep_threshold.py         # Threshold sweep: collect mode (API) + sweep mode (offline)
+├── config.py                  # API client, model names, embed/NLI model singletons
+├── run.py                     # Main runner: builds indexes, evaluates, saves CSVs
+├── pipeline.py                # run_comparison — single question walkthrough
+├── sweep_threshold.py         # Threshold sweep: collect (API) + sweep (offline)
+├── ablation.py                # Signal ablation experiments
+├── analysis.py                # Post-hoc analysis utilities
 ├── data/
 │   └── loader.py              # TAT-QA dataset loading and preprocessing
 ├── indexing/
-│   ├── table_parser.py        # Financial table → structured chunks (row/cell/section)
-│   └── vector_store.py        # FAISS index construction (baseline + table-aware)
+│   ├── table_parser.py        # Financial table → structured chunks
+│   └── vector_store.py        # FAISS index construction
 ├── retrieval/
 │   └── retriever.py           # Dense retrieval + lexical reranking + section expansion
 ├── tiers/
-│   ├── llm_utils.py           # ask_llm (with retry/backoff), format_context, strip_prefix
-│   ├── tier1.py               # Basic RAG — single LLM call
-│   ├── tier2.py               # Self-consistency (k=3 majority vote) + self-refine
-│   └── tier3.py               # Gatekeeper v4 + Skeptic + Grounder + Adjudicator
-├── evaluation/
-│   ├── metrics.py             # compute_f1, compute_em, compute_hallucination_rate
-│   └── evaluator.py           # evaluate_all, summarize_results
-└── notebooks/
-    └── experiments.ipynb      # Exploratory notebook
+│   ├── llm_utils.py           # ask_llm (retry/backoff), format_context helpers
+│   ├── baseline.py            # Tier 1: basic RAG
+│   ├── refinement.py          # Tier 2: refinement RAG
+│   ├── guardrag.py            # Tier 3: gatekeeper + debate + adjudicator
+│   └── pot.py                 # Program-of-Thought arithmetic verification
+└── evaluation/
+    ├── metrics.py             # compute_f1, compute_em, compute_hallucination_rate
+    └── evaluator.py           # evaluate_all, summarize_results
 ```
 
 ---
@@ -189,10 +176,16 @@ GUARD-RAG/
 
 **TAT-QA** — financial QA over hybrid tables + text from annual reports.
 
-Working split (from `tatqa_dataset_train.json`):
-- 100 samples loaded (`MAX_SAMPLES=100`)
-- 15 samples evaluated per run (`EVAL_SAMPLES=15`)
-- Threshold sweep uses samples 200–250 from the full dataset
+Download from the [official repo](https://github.com/NExTplusplus/TAT-QA) and place at:
+```
+data/tatqa_dataset_train.json
+```
+
+Run configuration (in `run.py`):
+- `MAX_SAMPLES = 300` — samples loaded from dataset
+- `EVAL_SAMPLES = 150` — samples evaluated per run
+- `TOP_K = 6` — retrieved chunks per query (T3 uses `TOP_K * 2 = 12`)
+- `RANDOM_SEED = 42`
 
 ---
 
@@ -200,11 +193,11 @@ Working split (from `tatqa_dataset_train.json`):
 
 | Role | Model | Provider |
 |------|-------|----------|
-| Generation — Tier 1 & 2 | `llama-3.1-8b-instant` | Groq |
-| Skeptic + Grounder (Tier 3) | `llama-3.1-8b-instant` | Groq |
-| Adjudicator (Tier 3) | `llama-3.3-70b-versatile` | Groq |
-| Embeddings | `all-MiniLM-L6-v2` | HuggingFace (sentence-transformers) |
-| NLI Grounding | `cross-encoder/nli-deberta-v3-small` | HuggingFace (sentence-transformers) |
+| Baseline & Refinement generation | `gpt-4o-mini` | OpenRouter |
+| GUARD-RAG Skeptic | `gpt-4o-mini` | OpenRouter |
+| GUARD-RAG Grounder & Adjudicator | `gpt-4o` | OpenRouter |
+| Embeddings | `all-MiniLM-L6-v2` | HuggingFace |
+| NLI Grounding | `cross-encoder/nli-deberta-v3-small` | HuggingFace |
 
 ---
 
@@ -215,49 +208,46 @@ Working split (from `tatqa_dataset_train.json`):
 pip install -r requirements.txt
 ```
 
-### 2. Set your Groq API key
+### 2. Set your OpenRouter API key
 ```bash
-export GROQ_API_KEY=your_key_here
+export OPENROUTER_API_KEY=your_key_here
 ```
-Get a free key at [console.groq.com](https://console.groq.com).
+Or add it to a `.env` file:
+```
+OPENROUTER_API_KEY=your_key_here
+```
+Get a key at [openrouter.ai](https://openrouter.ai).
 
 ### 3. Add the dataset
-Download TAT-QA from the [official repo](https://github.com/NExTplusplus/TAT-QA) and place:
-```
-data/tatqa_dataset_train.json
-data/tatqa_dataset_dev.json
-```
+Place `tatqa_dataset_train.json` in the `data/` directory.
 
 ### 4. Run
 
-**Full evaluation (all tiers, baseline vs improved):**
+**Full evaluation:**
 ```bash
-python3 run.py
+python run.py
 ```
-Outputs: `evaluation_baseline.csv`, `evaluation_improved.csv`, `evaluation_summary.csv`
+Outputs: `evaluation_results.csv`, `evaluation_summary.csv`
 
-**Threshold sweep (collect then analyze):**
+**Threshold sweep:**
 ```bash
-python3 sweep_threshold.py --mode collect   # runs API calls, saves sweep_data.csv
-python3 sweep_threshold.py --mode sweep     # offline analysis, generates sweep_plot.png
+python sweep_threshold.py --mode collect   # API calls, saves sweep_data.csv
+python sweep_threshold.py --mode sweep     # offline analysis
 ```
 
 ---
 
-## Implementation Status
+## Dependencies
 
-- [x] Basic RAG pipeline (Tier 1)
-- [x] Self-consistency majority vote, k=3 (Tier 2)
-- [x] Self-refine unsupported claim removal (Tier 2)
-- [x] Table-aware chunking (row / cell / section)
-- [x] Hybrid retrieval: dense + lexical reranking + section expansion
-- [x] Weighted gatekeeper (heuristic signals + NLI grounding, `gatekeeper_v4`)
-- [x] Asymmetric debate: Skeptic + Grounder + Adjudicator (Tier 3)
-- [x] Grounder citation verification (fuzzy match, flips unverifiable citations to CONCEDED)
-- [x] Adjudicator verdict labels: `[APPROVE]` / `[REVISE]` / `[ABSTAIN]`
-- [x] Gatekeeper signals passed to Skeptic for targeted claim checking
-- [x] Hallucination rate metric (NLI-based, per tier)
-- [x] Threshold sweep script with signal ablation
-- [x] Rate-limit retry with exponential backoff in `ask_llm`
-- [ ] DSPy-optimized Adjudicator (BootstrapFewShot)
-- [ ] Pareto frontier plot (Accuracy vs Token Cost)
+| Package | Version |
+|---------|---------|
+| faiss-cpu | 1.13.2 |
+| openai | 2.30.0 |
+| sentence-transformers | 4.0.2 |
+| torch | 2.6.0 |
+| numpy | 1.26.4 |
+| pandas | 2.1.0 |
+| transformers | 4.57.3 |
+| tqdm | 4.67.1 |
+| python-dotenv | 1.0.1 |
+| scikit-learn | 1.6.1 |

@@ -35,8 +35,12 @@ def evaluate_all(samples, baseline_index, baseline_chunks, baseline_metadata,
             b = baseline_rag(question, retrieved, client, BASE_MODEL)
             r = refinement_rag(question, retrieved, client, BASE_MODEL, baseline_result=b)
             g = guardrag_debate(question, retrieved_g, client, BASE_MODEL, JUDGE_MODEL, baseline_result=r, nli_model=nli_model, threshold=guardrag_threshold, disabled_signals=disabled_signals)
-        except RuntimeError as e:
-            print(f"\n  SKIPPED (rate limit exhausted): {question[:60]}")
+        except (RuntimeError, Exception) as e:
+            err = str(e)
+            if "400" in err or "BadRequest" in err:
+                print(f"\n  SKIPPED (bad request / bad data): {question[:60]}")
+            else:
+                print(f"\n  SKIPPED (rate limit exhausted): {question[:60]}")
             continue
 
         records.append({

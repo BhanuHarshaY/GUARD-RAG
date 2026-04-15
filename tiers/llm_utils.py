@@ -2,8 +2,18 @@ import re
 import time
 
 
+def _sanitize(text):
+    """Remove null bytes and non-printable control characters that break JSON."""
+    if not isinstance(text, str):
+        text = str(text)
+    # Strip null bytes and ASCII control chars except tab/newline/CR
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    return text
+
+
 def ask_llm(prompt, client, model, temperature=0.0, max_tokens=300):
     import time as _time
+    prompt = _sanitize(prompt)
     for attempt in range(12):
         try:
             start = _time.time()
@@ -36,6 +46,9 @@ def ask_llm(prompt, client, model, temperature=0.0, max_tokens=300):
                     wait = min(2 ** attempt * 5, 600)
                 print(f"  Rate limited, waiting {wait:.0f}s...")
                 _time.sleep(wait)
+            elif "400" in err or "BadRequest" in err:
+                # Bad prompt content — not retriable
+                raise
             else:
                 raise
     raise RuntimeError("Failed after 12 retries")
