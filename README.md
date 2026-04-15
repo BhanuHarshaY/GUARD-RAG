@@ -53,12 +53,12 @@ Evaluates the Tier 2 draft answer using 6 weighted heuristic + NLI signals. Deba
 
 | Signal | Weight | Fires when... |
 |--------|--------|---------------|
-| `heuristic_insufficient_info` | 0.40 | Answer says "insufficient information" but retrieved rows exist |
+| `heuristic_arithmetic` | 0.60 | Arithmetic keyword detected (percentage change, difference, ratio, sum, etc.) |
+| `heuristic_multispan` | 0.50 | Multiple entities/years requested (respectively, each of, both, etc.) |
+| `heuristic_insufficient_info` | 0.40 | Answer says "insufficient information" but structured table chunks exist |
+| `nli_low_grounding` | 0.30 | NLI entailment score < 0.35 (DeBERTa-v3-small) |
 | `heuristic_missing_rows` | 0.30 | List-like question with ≥2 row labels, but fewer than 2 mentioned in answer |
-| `heuristic_numeric_mismatch` | 0.35 | Extracted number in answer doesn't match any retrieved value |
-| `heuristic_too_long` | 0.15 | Answer exceeds 80 words |
-| `nli_low_grounding` | 0.50 | NLI model scores fewer than 50% of answer sentences as entailed by context |
-| `heuristic_multispan_incomplete` | 0.25 | Multi-span question where answer appears to be missing spans |
+| `heuristic_too_long` | 0.20 | Answer exceeds 80 words |
 
 NLI model: `cross-encoder/nli-deberta-v3-small`
 
@@ -72,7 +72,7 @@ Only runs when the gatekeeper triggers:
 
 **Grounder** (`gpt-4o`) — Responds to each challenged claim with `SUPPORTED: <claim> — Evidence: <exact quote>` or `CONCEDED: <claim>`. Cited quotes are fuzzy-matched against actual context; unverifiable citations are flipped to CONCEDED.
 
-**Adjudicator** (`gpt-4o`) — Reads the full debate transcript and produces a final verdict:
+**Adjudicator** (`gpt-4o` + DSPy `ChainOfThought`) — Reads the full debate transcript, generates an explicit reasoning trace, and produces a final verdict:
 - `APPROVE` — all claims supported, return draft unchanged
 - `REVISE` — some claims conceded, return revised answer
 - `ABSTAIN` — all claims conceded, return "Insufficient information."
@@ -132,13 +132,15 @@ T3 (GUARD-RAG) retrieves `top_k * 2` chunks for broader context; T1/T2 use `top_
 
 ---
 
-## Results (n=150, seed=42, TAT-QA train split)
+## Results (n=300, seed=42, TAT-QA train split)
 
-| System | F1 | EM | Hallucination Rate | Debate Rate |
-|--------|----|----|--------------------|-------------|
-| Baseline (T1) | 0.561 | 0.267 | 0.312 | — |
-| Refinement (T2) | 0.593 | 0.293 | 0.289 | — |
-| GUARD-RAG (T3) | **0.629** | **0.320** | **0.241** | 52.1% |
+| System | F1 | EM | Hallucination Rate | Avg Tokens | Debate Rate |
+|--------|----|----|--------------------|-----------:|-------------|
+| Baseline (T1) | 0.561 | 0.507 | 0.728 | 1,102 | — |
+| Refinement (T2) | 0.593 | 0.539 | 0.733 | 2,395 | — |
+| GUARD-RAG (T3) | **0.629** | **0.576** | **0.710** | 6,101 | 52.1% |
+
+GUARD-RAG achieves **+12.1% relative F1** over Baseline and the **lowest hallucination rate** of all three tiers. Refinement increases hallucination (+0.005) while GUARD-RAG decreases it (−0.018 vs Baseline). The largest gains fall on arithmetic questions (+13.2% F1 over Baseline).
 
 ---
 
@@ -165,9 +167,19 @@ GUARD-RAG/
 │   ├── refinement.py          # Tier 2: refinement RAG
 │   ├── guardrag.py            # Tier 3: gatekeeper + debate + adjudicator
 │   └── pot.py                 # Program-of-Thought arithmetic verification
-└── evaluation/
-    ├── metrics.py             # compute_f1, compute_em, compute_hallucination_rate
-    └── evaluator.py           # evaluate_all, summarize_results
+├── evaluation/
+│   ├── metrics.py             # compute_f1, compute_em, compute_hallucination_rate
+│   └── evaluator.py           # evaluate_all, summarize_results
+├── ablation_results/          # Pre-computed ablation CSVs and charts
+│   ├── ablation_comprehensive.csv  # 69-row full ablation (12 studies)
+│   ├── answer_type_breakdown.csv   # Arithmetic vs span F1
+│   ├── component_ablation.csv      # Per-component removal results
+│   ├── signal_ablation.csv         # Per-gatekeeper-signal removal results
+│   ├── threshold_sweep_offline.csv # F1 vs threshold T=0.35→1.0
+│   └── *.png                       # Visualisation charts
+├── evaluation_summary.csv     # Aggregate results (n=300)
+├── evaluation_results.csv     # Per-sample results
+└── guard_rag_neurips.tex      # NeurIPS 2026 paper (Overleaf-ready)
 ```
 
 ---
@@ -239,15 +251,16 @@ python sweep_threshold.py --mode sweep     # offline analysis
 
 ## Dependencies
 
-| Package | Version |
-|---------|---------|
-| faiss-cpu | 1.13.2 |
-| openai | 2.30.0 |
-| sentence-transformers | 4.0.2 |
-| torch | 2.6.0 |
-| numpy | 1.26.4 |
-| pandas | 2.1.0 |
-| transformers | 4.57.3 |
-| tqdm | 4.67.1 |
-| python-dotenv | 1.0.1 |
-| scikit-learn | 1.6.1 |
+| Package | Version | Purpose |
+|---------|---------|---------|
+| dspy | 3.1.3 | ChainOfThought adjudicator reasoning |
+| faiss-cpu | 1.13.2 | Vector similarity search |
+| openai | 2.30.0 | OpenRouter API client (GPT-4o-mini, GPT-4o) |
+| sentence-transformers | 4.0.2 | Embeddings (`all-MiniLM-L6-v2`) + NLI (`nli-deberta-v3-small`) |
+| torch | 2.6.0 | Backend for sentence-transformers |
+| numpy | 1.26.4 | Numeric operations |
+| pandas | 2.1.0 | Results CSV handling |
+| transformers | 4.57.3 | HuggingFace model loading |
+| tqdm | 4.67.1 | Progress bars |
+| python-dotenv | 1.0.1 | `.env` API key loading |
+| scikit-learn | 1.6.1 | Cosine similarity utilities |
