@@ -1,10 +1,42 @@
 import re
 import os
+import time as _time
 
 from tiers.llm_utils import ask_llm, format_retrieved_context, strip_refinement_prefix
 from tiers.baseline import baseline_rag, is_arithmetic_question
 from indexing.table_parser import normalize_text_for_match
 from retrieval.retriever import question_is_list_like, question_is_multispan
+
+# ---------------------------------------------------------------------------
+# DSPy ChainOfThought Adjudicator (lazy init — falls back gracefully)
+# ---------------------------------------------------------------------------
+_DSPY_COT            = None
+_DSPY_COT_INIT_DONE  = False
+
+def _get_dspy_cot():
+    """Lazy-initialise DSPy ChainOfThought adjudicator. Returns None on failure."""
+    global _DSPY_COT, _DSPY_COT_INIT_DONE
+    if _DSPY_COT_INIT_DONE:
+        return _DSPY_COT
+    _DSPY_COT_INIT_DONE = True
+    try:
+        import dspy
+        lm = dspy.LM(
+            model="openai/gpt-4o",
+            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+            api_base="https://openrouter.ai/api/v1",
+            temperature=0.0,
+            max_tokens=350,
+        )
+        dspy.configure(lm=lm)
+        _DSPY_COT = dspy.ChainOfThought(
+            "question, evidence, skeptic_challenges, grounder_verdicts -> verdict, final_answer"
+        )
+        print("  [DSPy] ChainOfThought adjudicator ready.")
+    except Exception as e:
+        print(f"  [DSPy] init failed ({e}); using prompt adjudicator.")
+        _DSPY_COT = None
+    return _DSPY_COT
 
 # ---------------------------------------------------------------------------
 # Signal weights
@@ -406,6 +438,37 @@ Instructions:
 Response:
 """.strip()
 
+    # ── Try DSPy ChainOfThought for non-arithmetic questions ─────────────────
+    # Provides explicit reasoning trace; catches formula-direction errors that
+    # a plain verdict prompt misses (e.g. "values correct but direction wrong").
+    if not is_arith:
+        cot = _get_dspy_cot()
+        if cot is not None:
+            try:
+                t0 = _time.time()
+                result = cot(
+                    question=question,
+                    evidence=context[:3000],
+                    skeptic_challenges=skeptic_output,
+                    grounder_verdicts=grounder_output,
+                )
+                elapsed = round(_time.time() - t0, 3)
+                raw_verdict = str(getattr(result, "verdict", "")).upper().strip()
+                raw_answer  = str(getattr(result, "final_answer", "")).strip()
+                if raw_verdict in ("APPROVE", "REVISE", "ABSTAIN") and raw_answer:
+                    if raw_verdict == "APPROVE":
+                        fa = draft_answer
+                    elif raw_verdict == "ABSTAIN":
+                        fa = "Insufficient information."
+                    else:
+                        fa = raw_answer
+                    # Rough token estimate: ~4 chars per token for context + output
+                    est_tokens = len(context[:3000]) // 4 + len(raw_answer) // 4 + 100
+                    return fa, raw_verdict, elapsed, est_tokens
+            except Exception:
+                pass  # fall through to plain-prompt adjudicator
+
+    # ── Plain-prompt adjudicator (fallback + arithmetic path) ────────────────
     out = ask_llm(prompt, client=client, model=JUDGE_MODEL, temperature=0.0, max_tokens=350)
     raw = strip_refinement_prefix(out["text"])
 
