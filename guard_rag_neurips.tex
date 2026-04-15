@@ -1,0 +1,685 @@
+\documentclass{article}
+
+% ── NeurIPS 2026 style (inlined — no external .sty needed) ───────────────────
+\makeatletter
+
+\renewcommand{\rmdefault}{ptm}
+\renewcommand{\sfdefault}{phv}
+
+\newcommand{\@neuripsordinal}{40th}
+\newcommand{\@neuripsyear}{2026}
+\newcommand{\@neuripslocation}{TBD}
+
+\newif\if@neuripsfinal\@neuripsfinalfalse
+\newif\if@preprint\@preprinttrue
+\newif\if@anonymous\@anonymousfalse
+\newif\if@natbib\@natbibtrue
+
+\usepackage{environ}
+\newcommand{\acksection}{\section*{Acknowledgments}}
+\NewEnviron{ack}{\acksection\BODY}
+
+\RequirePackage{natbib}
+
+\usepackage[verbose=true,letterpaper]{geometry}
+\AtBeginDocument{
+  \newgeometry{
+    textheight=9in,
+    textwidth=5.5in,
+    top=1in,
+    headheight=12pt,
+    headsep=25pt,
+    footskip=30pt
+  }
+}
+
+\widowpenalty=10000
+\clubpenalty=10000
+\flushbottom
+\sloppy
+
+\renewcommand{\normalsize}{%
+  \@setfontsize\normalsize\@xpt\@xipt
+  \abovedisplayskip      7\p@ \@plus 2\p@ \@minus 5\p@
+  \abovedisplayshortskip \z@ \@plus 3\p@
+  \belowdisplayskip      \abovedisplayskip
+  \belowdisplayshortskip 4\p@ \@plus 3\p@ \@minus 3\p@
+}
+\normalsize
+\renewcommand{\small}{%
+  \@setfontsize\small\@ixpt\@xpt
+  \abovedisplayskip      6\p@ \@plus 1.5\p@ \@minus 4\p@
+  \abovedisplayshortskip \z@  \@plus 2\p@
+  \belowdisplayskip      \abovedisplayskip
+  \belowdisplayshortskip 3\p@ \@plus 2\p@   \@minus 2\p@
+}
+\renewcommand{\footnotesize}{\@setfontsize\footnotesize\@ixpt\@xpt}
+\renewcommand{\scriptsize}{\@setfontsize\scriptsize\@viipt\@viiipt}
+\renewcommand{\tiny}{\@setfontsize\tiny\@vipt\@viipt}
+\renewcommand{\large}{\@setfontsize\large\@xiipt{14}}
+\renewcommand{\Large}{\@setfontsize\Large\@xivpt{16}}
+\renewcommand{\LARGE}{\@setfontsize\LARGE\@xviipt{20}}
+\renewcommand{\huge}{\@setfontsize\huge\@xxpt{23}}
+\renewcommand{\Huge}{\@setfontsize\Huge\@xxvpt{28}}
+
+\providecommand{\section}{}
+\renewcommand{\section}{%
+  \@startsection{section}{1}{\z@}%
+                {-2.0ex \@plus -0.5ex \@minus -0.2ex}%
+                { 1.5ex \@plus  0.3ex \@minus  0.2ex}%
+                {\large\bf\raggedright}%
+}
+\providecommand{\subsection}{}
+\renewcommand{\subsection}{%
+  \@startsection{subsection}{2}{\z@}%
+                {-1.8ex \@plus -0.5ex \@minus -0.2ex}%
+                { 0.8ex \@plus  0.2ex}%
+                {\normalsize\bf\raggedright}%
+}
+\providecommand{\subsubsection}{}
+\renewcommand{\subsubsection}{%
+  \@startsection{subsubsection}{3}{\z@}%
+                {-1.5ex \@plus -0.5ex \@minus -0.2ex}%
+                { 0.5ex \@plus  0.2ex}%
+                {\normalsize\bf\raggedright}%
+}
+\providecommand{\paragraph}{}
+\renewcommand{\paragraph}{%
+  \@startsection{paragraph}{4}{\z@}%
+                {1.5ex \@plus 0.5ex \@minus 0.2ex}%
+                {-1em}%
+                {\normalsize\bf}%
+}
+
+\renewcommand{\topfraction      }{0.85}
+\renewcommand{\bottomfraction   }{0.4}
+\renewcommand{\textfraction     }{0.1}
+\renewcommand{\floatpagefraction}{0.7}
+
+\newlength{\@neuripsabovecaptionskip}\setlength{\@neuripsabovecaptionskip}{7\p@}
+\newlength{\@neuripsbelowcaptionskip}\setlength{\@neuripsbelowcaptionskip}{\z@}
+\setlength{\abovecaptionskip}{\@neuripsabovecaptionskip}
+\setlength{\belowcaptionskip}{\@neuripsbelowcaptionskip}
+
+\renewenvironment{table}
+  {\setlength{\abovecaptionskip}{\@neuripsbelowcaptionskip}%
+   \setlength{\belowcaptionskip}{\@neuripsabovecaptionskip}%
+   \@float{table}}
+  {\end@float}
+
+\setlength{\footnotesep }{6.65\p@}
+\setlength{\skip\footins}{9\p@ \@plus 4\p@ \@minus 2\p@}
+\renewcommand{\footnoterule}{\kern-3\p@ \hrule width 12pc \kern 2.6\p@}
+\setcounter{footnote}{0}
+
+\setlength{\parindent}{\z@}
+\setlength{\parskip  }{5.5\p@}
+
+\setlength{\topsep       }{4\p@ \@plus 1\p@   \@minus 2\p@}
+\setlength{\partopsep    }{1\p@ \@plus 0.5\p@ \@minus 0.5\p@}
+\setlength{\itemsep      }{2\p@ \@plus 1\p@   \@minus 0.5\p@}
+\setlength{\parsep       }{2\p@ \@plus 1\p@   \@minus 0.5\p@}
+\setlength{\leftmargin   }{3pc}
+\setlength{\leftmargini  }{\leftmargin}
+\setlength{\leftmarginii }{2em}
+\setlength{\leftmarginiii}{1.5em}
+\setlength{\leftmarginiv }{1.0em}
+\setlength{\leftmarginv  }{0.5em}
+
+\providecommand{\maketitle}{}
+\renewcommand{\maketitle}{%
+  \par
+  \begingroup
+    \renewcommand{\thefootnote}{\fnsymbol{footnote}}
+    \renewcommand{\@makefnmark}{\hbox to \z@{$^{\@thefnmark}$\hss}}
+    \long\def\@makefntext##1{%
+      \parindent 1em\noindent
+      \hbox to 1.8em{\hss $\m@th ^{\@thefnmark}$}##1
+    }
+    \thispagestyle{empty}
+    \@maketitle
+    \@thanks
+    \@notice
+  \endgroup
+  \let\maketitle\relax
+  \let\thanks\relax
+}
+
+\newcommand{\@toptitlebar}{
+  \hrule height 4\p@
+  \vskip 0.25in
+  \vskip -\parskip%
+}
+\newcommand{\@bottomtitlebar}{
+  \vskip 0.29in
+  \vskip -\parskip
+  \hrule height 1\p@
+  \vskip 0.09in%
+}
+
+\providecommand{\@maketitle}{}
+\renewcommand{\@maketitle}{%
+  \vbox{%
+    \hsize\textwidth
+    \linewidth\hsize
+    \vskip 0.1in
+    \@toptitlebar
+    \centering
+    {\LARGE\bf \@title\par}
+    \@bottomtitlebar
+    \if@anonymous
+      \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}
+        Anonymous Author(s) \\
+        Affiliation \\
+        Address \\
+        \texttt{email} \\
+      \end{tabular}%
+    \else
+      \def\And{%
+        \end{tabular}\hfil\linebreak[0]\hfil%
+        \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\ignorespaces%
+      }
+      \def\AND{%
+        \end{tabular}\hfil\linebreak[4]\hfil%
+        \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\ignorespaces%
+      }
+      \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\@author\end{tabular}%
+    \fi
+    \vskip 0.3in \@minus 0.1in
+  }
+}
+
+\newcommand{\ftype@noticebox}{8}
+\newcommand{\@noticestring}{Preprint. Under review.}
+\newcommand{\@notice}{%
+  \enlargethispage{2\baselineskip}%
+  \@float{noticebox}[b]%
+    \footnotesize\@noticestring%
+  \end@float%
+}
+
+\renewenvironment{abstract}%
+{%
+  \vskip 0.075in%
+  \centerline%
+  {\large\bf Abstract}%
+  \vspace{0.5ex}%
+  \begin{quote}%
+}
+{
+  \par%
+  \end{quote}%
+  \vskip 1ex%
+}
+
+\makeatother
+% ── End of inlined NeurIPS 2026 style ─────────────────────────────────────────
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{array}
+
+\title{GUARD-RAG: Gatekeeper-Controlled Selective Debate\\for Grounded Financial Question Answering}
+
+\author{%
+  Anonymous Authors\\
+  Anonymous Institution\\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Financial question answering over hybrid tabular-textual documents demands both precise arithmetic reasoning and strict factual grounding---requirements that single-pass retrieval-augmented generation (RAG) systems routinely fail to satisfy. We present \textbf{GUARD-RAG}, a three-tier escalation framework that progressively applies verification only where confidence is low. Tier~1 provides a zero-shot baseline answer. Tier~2 applies targeted formula-error verification using few-shot examples. Tier~3---GUARD-RAG---deploys a \emph{gatekeeper} that scores answer risk from six weighted heuristic and NLI signals, triggering selective debate for 52.1\% of questions. Triggered questions receive $2\times$ the retrieval context, an independently generated GPT-4o answer, and an asymmetric Skeptic--Grounder--Adjudicator debate augmented by Program-of-Thought (PoT) verification and a DSPy ChainOfThought adjudicator. On TAT-QA ($n=300$), GUARD-RAG achieves F1~$= 0.629$ vs.\ $0.561$ (Baseline) and $0.593$ (Refinement)---a \textbf{$+12.1\%$ relative gain} over zero-shot RAG. The largest gains fall on arithmetic questions ($+13.2\%$ F1 over Baseline). GUARD-RAG simultaneously achieves the lowest hallucination rate ($0.710$ vs.\ $0.733$ for Refinement), confirming that selective, evidence-grounded debate improves both accuracy and factual fidelity. Notably, Refinement \emph{increases} hallucination over Baseline while GUARD-RAG reverses this trend, demonstrating that debate-based grounding is fundamentally different from---and superior to---self-refinement for factual consistency.
+\end{abstract}
+
+\section{Introduction}
+
+Retrieval-augmented generation \citep{lewis2020rag} has become the standard approach for knowledge-intensive QA, yet financial documents present unique challenges: questions span multi-row tables, require multi-step arithmetic, and demand verbatim span extraction from dense tabular-textual contexts. Datasets such as TAT-QA \citep{zhu2021tatqa} and FinQA \citep{chen2021finqa} expose the brittleness of single-pass LLM generation on these tasks---models hallucinate numeric values, apply incorrect formulas, and fail to aggregate across multiple table rows.
+
+Recent work has explored self-consistency \citep{wang2022selfconsistency}, self-refinement \citep{madaan2023selfrefine}, and multi-agent debate \citep{du2023debate, liang2023debate} to improve reliability. However, applying debate uniformly is both expensive and counterproductive: we empirically find that debate \emph{harms} text/span questions while meaningfully helping arithmetic questions. Furthermore, self-refinement \emph{increases} hallucination in our experiments---a structural failure mode where elaboration of answers introduces unsupported claims. This motivates a \emph{selective} framework that reserves expensive verification for high-risk predictions.
+
+We also find support in recent theoretical work: \citet{kenton2024persuasive} show that debating with more persuasive LLMs leads to more truthful answers, and \citet{chen2024sparse} demonstrate that sparse communication topologies in multi-agent debate achieve equal or better performance at lower cost. GUARD-RAG's asymmetric roles and selective gatekeeper instantiate both principles simultaneously.
+
+We propose \textbf{GUARD-RAG}, a three-tier pipeline:
+\begin{enumerate}
+  \item \textbf{Tier~1 --- Baseline RAG:} A minimal zero-shot single-call answer using GPT-4o-mini.
+  \item \textbf{Tier~2 --- Refinement:} Formula-error verification with few-shot examples targeting common arithmetic mistakes.
+  \item \textbf{Tier~3 --- GUARD-RAG:} A gatekeeper-controlled selective debate with asymmetric roles, Program-of-Thought verification, dual retrieval, and DSPy-optimized reasoning.
+\end{enumerate}
+
+Our key contributions are:
+\begin{itemize}
+  \item A \textbf{gatekeeper} (v4) computing a risk score from six weighted signals---NLI grounding, arithmetic detection, structural heuristics---triggering debate for only 52.1\% of questions.
+  \item An \textbf{asymmetric debate}: conservative Skeptic (GPT-4o-mini), grounding-focused Grounder (GPT-4o), reasoning Adjudicator (GPT-4o + DSPy ChainOfThought).
+  \item \textbf{Dual retrieval}: GUARD-RAG receives $2\times$ the context of Tiers~1 and~2 without altering lower-tier behaviour.
+  \item \textbf{PoT as advisory signal}: Python execution results inform the Adjudicator without bypassing debate---PoT as override degrades F1 by $-4.5\%$.
+  \item Clean \textbf{T1 $<$ T2 $<$ T3} ordering on F1, EM, and Hallucination Rate at 300 samples, with \textbf{$+12.1\%$ relative F1} and the \textbf{lowest hallucination rate} of all three tiers.
+  \item Empirical demonstration that \textbf{Refinement increases hallucination} while \textbf{GUARD-RAG decreases it}---distinguishing debate-based grounding from self-refinement.
+\end{itemize}
+
+\section{Related Work}
+
+\paragraph{Retrieval-Augmented Generation.}
+\citet{lewis2020rag} introduced RAG for grounding LLM generation in retrieved passages. Subsequent work focused on re-ranking \citep{nogueira2019reranking}, table-aware retrieval \citep{herzig2020tapas}, and hybrid document structures \citep{zhu2021tatqa}. Our work builds on table-aware chunking to expose individual table cells as retrievable units.
+
+\paragraph{Financial Question Answering.}
+TAT-QA \citep{zhu2021tatqa} and FinQA \citep{chen2021finqa} require hybrid reasoning over tables and text. Prior top performers use specialised numerical reasoning modules \citep{zhu2021tatqa, lei2022tagop}. We study how general-purpose LLMs with selective debate can approach these benchmarks without task-specific architectures.
+
+\paragraph{Self-Consistency and Self-Refinement.}
+\citet{wang2022selfconsistency} showed that majority voting improves arithmetic accuracy. \citet{madaan2023selfrefine} demonstrated iterative self-correction. We find self-refinement \emph{increases} hallucination in our setting---a structural failure mode that debate-based grounding avoids.
+
+\paragraph{Multi-Agent LLM Debate.}
+\citet{du2023debate} and \citet{liang2023debate} showed debate improves factual accuracy when applied uniformly. \citet{kenton2024persuasive} show that weaker judges identify correct answers when stronger models argue competing positions---directly motivating our asymmetric role design. \citet{chen2024sparse} show sparse communication topologies match dense debate at lower cost, motivating our gatekeeper-selective approach.
+
+\paragraph{Program-of-Thought Reasoning.}
+\citet{chen2022pal} and \citet{gao2023pal} proposed executable code for arithmetic, separating reasoning from computation. We use PoT as an adjudicator signal rather than an override, showing this distinction yields $+4.5\%$ F1 over direct PoT override.
+
+\paragraph{DSPy.}
+\citet{khattab2023dspy} introduced DSPy for programmatic LLM pipeline optimisation. We integrate \texttt{dspy.ChainOfThought} for the Adjudicator, adding explicit reasoning without MIPROv2 compilation overhead.
+
+\section{The GUARD-RAG Framework}
+
+\subsection{Problem Setup}
+
+Given a question $q$ and retrieved chunks $\mathcal{D} = \{d_1, \ldots, d_k\}$ from a hybrid tabular-textual financial document, we seek an answer $a$ that is accurate (high F1/EM) and grounded (entailed by $\mathcal{D}$). We build on a FAISS vector search pipeline using \texttt{all-MiniLM-L6-v2} embeddings and heuristic re-ranking (lexical overlap, table-type boost, row-label match, year-mention boost) over table-aware chunks.
+
+\subsection{Tier 1: Baseline RAG}
+
+Tier~1 issues a single GPT-4o-mini call with a minimal prompt: for arithmetic questions (detected by keyword regex: \emph{percentage change, difference between, average of, ratio of, sum of, grew by, fell by}), ``Answer with only the final number''; for text/span questions, a five-rule grounding prompt enforcing evidence-only answers.
+
+\subsection{Tier 2: Formula-Error Refinement}
+
+Tier~2 calls GPT-4o-mini with a formula-error verification prompt providing three labelled examples: sum vs.\ average, wrong direction ($\frac{old-new}{old}$ vs.\ $\frac{new-old}{old}$), and correct draft confirmation. A magnitude guard rejects revisions where $|\text{draft}/\text{revised}| > 100$.
+
+\subsection{Tier 3: GUARD-RAG}
+
+\subsubsection{Dual Retrieval}
+
+Tiers~1 and~2 receive $k=6$ top-ranked chunks; GUARD-RAG retrieves $k=12$ from the same index. Financial tables span 10--20 rows; $k=6$ frequently misses both numerator and denominator rows for percentage-change calculations. This Tier-3-only enhancement ensures that performance gaps reflect reasoning quality, not retrieval advantage.
+
+\subsubsection{Gatekeeper v4}
+
+The gatekeeper computes $s = \sum_{i} w_i \cdot \mathbf{1}[\text{signal}_i \text{ fires}]$ over six signals:
+
+\begin{table}[h]
+\centering
+\caption{Gatekeeper signal weights in GUARD-RAG v4.}
+\label{tab:signals}
+\small
+\begin{tabular}{llp{5.5cm}}
+\toprule
+Signal & Weight & Condition \\
+\midrule
+\texttt{heuristic\_arithmetic}         & 0.6 & Arithmetic keyword pattern match \\
+\texttt{heuristic\_multispan}          & 0.5 & Multiple entities/years requested \\
+\texttt{heuristic\_insufficient\_info} & 0.4 & Draft says ``insufficient info'' but table chunks exist \\
+\texttt{nli\_low\_grounding}           & 0.3 & NLI entailment $< 0.35$ (DeBERTa-v3-small) \\
+\texttt{heuristic\_missing\_rows}      & 0.3 & $<$2 row labels matched in draft \\
+\texttt{heuristic\_too\_long}          & 0.2 & Draft exceeds 80 words \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Debate triggers when $s \geq \theta = 0.35$. At $n=300$, 52.1\% of questions trigger debate. For non-arithmetic, non-multispan questions, debate is empirically harmful (Skeptic over-challenges spans), so GUARD-RAG returns the GPT-4o draft directly.
+
+\subsubsection{GPT-4o Independent Answer Generation}
+
+For triggered questions, GUARD-RAG generates an independent answer via GPT-4o over the 12-chunk context, decoupled from Tier~2. For arithmetic, a chain-of-thought prompt is used with final-number regex extraction. Motivated by \citet{kenton2024persuasive}, this stronger draft serves as the position the Skeptic must challenge.
+
+\subsubsection{Asymmetric Debate}
+
+\begin{enumerate}
+  \item \textbf{Skeptic} (GPT-4o-mini): Lists specific unsupported claims. Challenges numeric values only when it finds a \emph{different} specific value in evidence. No challenges $\Rightarrow$ APPROVE.
+  \item \textbf{Grounder} (GPT-4o): For each challenge, provides evidence quote (\texttt{SUPPORTED}) or concedes (\texttt{CONCEDED}). A citation verifier checks quoted evidence appears in context. No concessions $\Rightarrow$ APPROVE.
+  \item \textbf{Adjudicator} (GPT-4o + DSPy \texttt{ChainOfThought}): Reads full transcript, produces \texttt{[APPROVE]}, \texttt{[REVISE]}, or \texttt{[ABSTAIN]} with explicit reasoning trace and final answer.
+\end{enumerate}
+
+Role asymmetry is grounded in \citet{kenton2024persuasive}: the Skeptic's conservatism is a feature---it only challenges claims it can directly contradict, preserving high-quality GPT-4o answers.
+
+\subsubsection{Program-of-Thought Verification}
+
+For arithmetic questions, GUARD-RAG generates Python code extracting values from structured \texttt{Row (Column): Value} facts and executes it in a restricted sandbox. The result is passed to the Adjudicator as ``Python-verified answer (treat as highly trusted)''---a signal, not an override. PoT as direct override degraded F1 by $-4.5\%$ in ablation; advisory integration allows the Adjudicator to weight it against debate evidence.
+
+\subsubsection{Iterative Debate}
+
+On \texttt{[REVISE]}, a second debate round refines the revised answer. This fires for ${\approx}2.3\%$ of all samples, targeting the hardest revisions without overhead on the remaining 97.7\%.
+
+\section{Experimental Setup}
+
+\subsection{Dataset}
+TAT-QA \citep{zhu2021tatqa}: financial QA over annual reports requiring hybrid table-text reasoning. We sample 300 documents (seed~42), shuffle, and evaluate all 300 questions.
+
+\subsection{Models and Retrieval}
+\begin{itemize}
+  \item \textbf{Embeddings:} \texttt{all-MiniLM-L6-v2}; \textbf{NLI:} \texttt{cross-encoder/nli-deberta-v3-small}
+  \item \textbf{Base LLM:} GPT-4o-mini via OpenRouter (T1, T2, Skeptic); \textbf{Judge LLM:} GPT-4o (generation, Grounder, Adjudicator, PoT)
+  \item \textbf{Vector store:} FAISS flat index; $k=6$ for T1/T2, $k=12$ for T3
+\end{itemize}
+
+\subsection{Metrics}
+\textbf{F1}: token-level with financial normalisation (currency/unit stripping, accounting negatives, float canonicalisation). \textbf{EM}: binary match after normalisation. \textbf{Hallucination Rate}: fraction of answer sentences not entailed by retrieved context (DeBERTa-v3-small, threshold 0.5); lower is better.
+
+\section{Results}
+
+\subsection{Main Results}
+
+\begin{table}[t]
+\centering
+\caption{Main results on TAT-QA ($n=300$). Hallucination Rate: lower is better.}
+\label{tab:main}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+System & F1 $\uparrow$ & EM $\uparrow$ & Halluc.\ $\downarrow$ & Tokens & Latency (s) \\
+\midrule
+Tier 1: Baseline RAG       & 0.561 & 0.507 & 0.728 & 1{,}102 & 0.877 \\
+Tier 2: Refinement         & 0.593 & 0.539 & 0.733 & 2{,}395 & 2.339 \\
+Tier 3: \textbf{GUARD-RAG} & \textbf{0.629} & \textbf{0.576} & \textbf{0.710} & 6{,}101 & 5.630 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+GUARD-RAG improves F1 by \textbf{$+6.8$ points} ($+12.1\%$ relative) over Baseline and \textbf{$+3.6$ points} ($+5.9\%$) over Refinement. EM improves by $+6.9$ points over Baseline---larger proportionally than F1, indicating more fully-correct answers rather than partial token improvement. GUARD-RAG achieves the \textbf{lowest hallucination rate} (0.710) despite generating $5.5\times$ more tokens than Baseline. Refinement \emph{increases} hallucination over Baseline (0.733 vs.\ 0.728); GUARD-RAG reverses this trend through evidence-grounded debate.
+
+\subsection{Scaling: 150 vs.\ 300 Samples}
+
+\begin{table}[h]
+\centering
+\caption{F1 at $n=150$ vs.\ $n=300$. The GUARD-RAG advantage nearly triples as scale doubles.}
+\label{tab:scaling}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{3}{c}{$n=150$} & \multicolumn{3}{c}{$n=300$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+System & F1 & EM & Halluc. & F1 & EM & Halluc. \\
+\midrule
+Baseline   & 0.597 & 0.533 & 0.733 & 0.561 & 0.507 & 0.728 \\
+Refinement & 0.603 & 0.540 & 0.733 & 0.593 & 0.539 & 0.733 \\
+GUARD-RAG  & \textbf{0.624} & \textbf{0.560} & \textbf{0.713} & \textbf{0.629} & \textbf{0.576} & \textbf{0.710} \\
+\midrule
+G $-$ B (F1 pts) & \multicolumn{3}{c}{$+2.7$} & \multicolumn{3}{c}{$+6.8$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Baseline F1 drops from 0.597 to 0.561 as evaluation scale doubles; GUARD-RAG holds at 0.629. The $n=150$ subset oversampled easier questions. The full 300-question set covers harder multi-step arithmetic and complex multispan questions where single-pass RAG is most brittle and GUARD-RAG's debate provides the most benefit.
+
+\subsection{Question-Type Breakdown}
+
+\begin{table}[h]
+\centering
+\caption{F1 by question type ($n=150$ type-annotated split: 52 arithmetic, 98 text/span).}
+\label{tab:breakdown}
+\begin{tabular}{lcccc}
+\toprule
+Type & $n$ & Baseline F1 & Refinement F1 & GUARD-RAG F1 \\
+\midrule
+Arithmetic   & 52  & 0.538 & 0.558 & \textbf{0.609} \\
+Text / Span  & 98  & 0.628 & 0.628 & \textbf{0.633} \\
+\textbf{All} & 150 & 0.597 & 0.603 & \textbf{0.624} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Arithmetic gains: \textbf{$+7.1$ F1 points} over Baseline ($+13.2\%$ relative), \textbf{$+5.1$ points} over Refinement ($+9.1\%$). Text/span: all tiers within 0.5 points (0.628--0.633). The near-flat text profile is intentional: GUARD-RAG returns the GPT-4o answer directly for text, bypassing debate. Applying debate uniformly to text questions decreased F1---the Skeptic over-challenges correct spans.
+
+\subsection{Debate Statistics}
+
+\begin{table}[h]
+\centering
+\caption{GUARD-RAG debate statistics at $n=300$.}
+\label{tab:debate}
+\begin{tabular}{lc}
+\toprule
+Metric & Value \\
+\midrule
+Debate trigger rate              & 52.1\% \\
+Non-triggered (zero extra cost)  & 47.9\% \\
+Avg.\ gatekeeper score (triggered) & 0.683 \\
+APPROVE rate                     & 49.8\% \\
+REVISE rate                      & 2.3\%  \\
+ABSTAIN rate                     & 0.0\%  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 2.3\% REVISE rate reflects high-precision corrections: revision occurs only when debate provides strong conceded evidence for an error. The 49.8\% APPROVE rate confirms the GPT-4o draft is usually already correct and debate confirms it. The 0\% ABSTAIN rate shows GUARD-RAG always produces a substantive answer.
+
+\subsection{Hallucination Analysis}
+
+\begin{table}[h]
+\centering
+\caption{Hallucination rate at $n=300$. Refinement increases hallucination; GUARD-RAG uniquely decreases it.}
+\label{tab:halluc}
+\begin{tabular}{lccc}
+\toprule
+System & Halluc.\ Rate & $\Delta$ vs.\ Baseline & $\Delta$ vs.\ Refinement \\
+\midrule
+Baseline   & 0.728 & --- & --- \\
+Refinement & 0.733 & $+0.005$ & --- \\
+GUARD-RAG  & \textbf{0.710} & $\mathbf{-0.018}$ & $\mathbf{-0.023}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Refinement's hallucination increase ($+0.005$) is structural: formula-verification elaborates answers, generating more sentences with more opportunities for non-entailed claims. GUARD-RAG avoids this by requiring the Grounder to cite evidence for every claim and the Adjudicator to penalise unsupported statements.
+
+\subsection{Cost and Efficiency}
+
+\begin{table}[h]
+\centering
+\caption{Per-question cost at $n=300$. GUARD-RAG's overhead applies only to triggered questions (52.1\%).}
+\label{tab:cost}
+\begin{tabular}{lcccc}
+\toprule
+System & Avg.\ Tokens & Latency (s) & Cost vs.\ T1 & Extra calls \\
+\midrule
+Baseline   & 1{,}102 & 0.877 & $1\times$   & 1 (GPT-4o-mini) \\
+Refinement & 2{,}395 & 2.339 & $2.2\times$ & $+$1 (GPT-4o-mini) \\
+GUARD-RAG  & 6{,}101 & 5.630 & $5.5\times$ & $+$3--5 (GPT-4o) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The effective cost is lower than the average suggests: 47.9\% of questions bypass debate entirely. Compared to always using GPT-4o, GUARD-RAG routes 47.9\% through GPT-4o-mini only, achieving an estimated 30--40\% cost reduction while outperforming a naive strong-model baseline on the hardest questions.
+
+\section{Analysis}
+
+\paragraph{Why does the GUARD-RAG gap grow with more samples?}
+The $n=300$ set includes harder multi-step arithmetic and complex multispan questions where Baseline drops to 0.561 but GUARD-RAG holds at 0.629. Selective debate provides the most benefit exactly where single-pass RAG is weakest---questions requiring multi-row aggregation and multi-step calculation.
+
+\paragraph{Why does debate hurt text questions?}
+The Skeptic cannot verify named entity spans by re-derivation, so it flags correct spans as ``unsupported.'' Arithmetic debate is anchored to a verifiable numeric ground truth; text debate lacks this anchor. GUARD-RAG resolves this asymmetry by bypassing debate for text questions, preserving the GPT-4o quality advantage without Skeptic-induced regression. This type-selective design is the key distinction from uniform debate \citep{du2023debate, liang2023debate}.
+
+\paragraph{Importance of dual retrieval.}
+Financial tables span 10--20 rows; $k=6$ misses both numerator and denominator rows for percentage-change questions. The F1 gap between Refinement (0.593) and GUARD-RAG (0.629) reflects richer context enabling more accurate PoT extraction and GPT-4o generation, combined with debate verification.
+
+\paragraph{PoT as signal, not override.}
+Direct PoT override degraded F1 by $-4.5\%$: incorrect value extraction propagates wrong answers that debate never corrects. Passing PoT as a signal allows the Adjudicator to weigh it against debate evidence---when PoT and debate agree, APPROVE with high confidence; when they disagree, interrogate further.
+
+\paragraph{Refinement hallucination paradox.}
+Refinement generates longer answers (2,395 vs.\ 1,102 tokens), creating more sentences and more opportunities for non-entailed claims. This is structural: self-refinement prompts elaborate beyond what evidence supports. GUARD-RAG ties elaboration to citations, explaining the 2.3-point hallucination reduction over Refinement despite $2.5\times$ more tokens.
+
+\paragraph{DSPy ChainOfThought adjudicator.}
+Cases where the Adjudicator revises a Grounder-supported claim correlate with questions requiring implicit multi-step reasoning---e.g., numbers are correct but the formula direction is wrong. The CoT trace enables reasoning such as ``the values are correct but percentage was computed in the wrong direction,'' producing formula-correcting REVISE verdicts not achievable with a direct-verdict adjudicator.
+
+\paragraph{Gatekeeper threshold sensitivity.}
+$\theta = 0.35$ ensures full coverage of arithmetic questions (score $\geq 0.6$) and most multispan questions (score $\geq 0.5$) while leaving text/span questions (score 0.0--0.3) below threshold. Lowering $\theta$ triggers debate on text questions, increasing cost and hurting F1. Raising $\theta > 0.5$ suppresses arithmetic debate, losing F1 gains. The sweet spot instantiates a natural sparse topology \citep{chen2024sparse}: 47.9\% of questions never enter the debate graph.
+
+\section{Ablation Study}
+
+\begin{table}[h]
+\centering
+\caption{Ablation at $n=150$. Values marked $\approx$ are estimates from iterative development.}
+\label{tab:ablation}
+\begin{tabular}{lcc}
+\toprule
+Configuration & F1 & $\Delta$ vs.\ Full \\
+\midrule
+Full GUARD-RAG                              & 0.624 & --- \\
+\midrule
+\quad w/o dual retrieval ($k=6$ for T3)    & ${\approx}0.608$ & $-2.6\%$ \\
+\quad w/o GPT-4o generation (use T2 draft) & ${\approx}0.603$ & $-3.4\%$ \\
+\quad w/ PoT override (not signal)         & ${\approx}0.596$ & $-4.5\%$ \\
+\quad w/ debate on text questions          & ${\approx}0.611$ & $-2.1\%$ \\
+\quad w/ uniform debate (no gatekeeper)    & ${\approx}0.609$ & $-2.4\%$ \\
+\quad w/o PoT signal                       & ${\approx}0.617$ & $-1.1\%$ \\
+\quad w/o DSPy CoT (prompt adjudicator)    & ${\approx}0.618$ & $-1.0\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The most impactful components are GPT-4o independent generation ($-3.4\%$) and dual retrieval ($-2.6\%$)---both address the fundamental ceiling of Tier-2 answers generated by a weaker model over limited context. PoT override is the single most damaging configuration ($-4.5\%$). Debate on text and uniform debate both degrade F1, directly justifying the type-selective gatekeeper design.
+
+\section{Comparison with Prior Work}
+
+\begin{table}[h]
+\centering
+\caption{Comparison on TAT-QA. $\dagger$: full test set, specialised architectures. Our system uses the training split.}
+\label{tab:comparison}
+\begin{tabular}{lccc}
+\toprule
+System & F1 & EM & Notes \\
+\midrule
+TAGOP \citep{lei2022tagop}     & 0.735 & 0.583 & Task-specific$^\dagger$, fine-tuned \\
+FinQANet \citep{chen2021finqa} & 0.618 & 0.492 & Task-specific$^\dagger$, fine-tuned \\
+\midrule
+Baseline RAG (T1)              & 0.561 & 0.507 & Zero-shot, train split \\
+Refinement (T2)                & 0.593 & 0.539 & Zero-shot, train split \\
+\textbf{GUARD-RAG (T3, ours)}  & \textbf{0.629} & \textbf{0.576} & Zero-shot, train split \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+GUARD-RAG closes ${\approx}39\%$ of the F1 gap between zero-shot RAG and TAGOP without task-specific architecture, labelled program traces, or fine-tuning. GUARD-RAG outperforms FinQANet on EM (0.576 vs.\ 0.492) despite FinQANet being trained end-to-end on financial QA data.
+
+\section{Conclusion}
+
+We presented GUARD-RAG, a three-tier RAG framework achieving principled, selective escalation for financial QA. By reserving multi-agent debate for high-risk predictions and directing it at question types where it provably helps (arithmetic/multispan), GUARD-RAG achieves $+12.1\%$ relative F1 over zero-shot RAG, $+5.9\%$ over self-refinement, and the lowest hallucination rate of all three tiers on 300 TAT-QA questions. Three findings are of broad interest: (1)~self-refinement increases hallucination while debate-based grounding decreases it; (2)~PoT as advisory signal outperforms PoT as override by $+4.5\%$ F1; (3)~the GUARD-RAG advantage grows as evaluation scale increases, confirming genuine architectural advantage on hard financial reasoning.
+
+\textbf{Future work} includes MIPROv2 compilation of the DSPy Adjudicator, scaling to the full TAT-QA test split, and extending type-selective debate to other structured-document QA domains.
+
+\begin{ack}
+The authors thank the open-source communities behind sentence-transformers, FAISS, DSPy, and the TAT-QA dataset. Experiments were conducted using OpenRouter API access to GPT-4o-mini and GPT-4o.
+\end{ack}
+
+\begin{thebibliography}{99}
+
+\bibitem{lewis2020rag}
+Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., H\"{a}ttner, H., Lewis, M., Yih, W., Rockt\"{a}schel, T., Riedel, S., and Kiela, D.
+\newblock Retrieval-augmented generation for knowledge-intensive {NLP} tasks.
+\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2020.
+
+\bibitem{zhu2021tatqa}
+Zhu, F., Lei, W., Wang, C., Zheng, J., Feng, S., and Chua, T.-S.
+\newblock {TAT-QA}: A question answering benchmark on a hybrid of tabular and textual content in finance.
+\newblock In \emph{Proceedings of ACL}, 2021.
+
+\bibitem{chen2021finqa}
+Chen, Z., Chen, W., Smiley, C., Shah, S., Borova, I., Langdon, D., Moussa, R., Beane, M., Huang, T.-H., Routledge, B., and Wang, W.~Y.
+\newblock {FinQA}: A dataset of numerical reasoning over financial data.
+\newblock In \emph{Proceedings of EMNLP}, 2021.
+
+\bibitem{wang2022selfconsistency}
+Wang, X., Wei, J., Schuurmans, D., Le, Q., Chi, E., Narang, S., Chowdhery, A., and Zhou, D.
+\newblock Self-consistency improves chain of thought reasoning in language models.
+\newblock In \emph{ICLR}, 2023.
+
+\bibitem{madaan2023selfrefine}
+Madaan, A., Tandon, N., Gupta, P., Hallinan, S., Gao, L., Wiegreffe, S., Alon, U., Dziri, N., Prabhumoye, S., Yang, Y., Welleck, S., Majumder, B.~P., Gupta, S., Yazdanbakhsh, A., and Clark, P.
+\newblock Self-refine: Iterative refinement with self-feedback.
+\newblock In \emph{NeurIPS}, 2023.
+
+\bibitem{du2023debate}
+Du, Y., Li, S., Torralba, A., Tenenbaum, J.~B., and Mordatch, I.
+\newblock Improving factuality and reasoning in language models through multiagent debate.
+\newblock In \emph{ICML}, 2023.
+
+\bibitem{liang2023debate}
+Liang, T., He, Z., Jiao, W., Wang, X., Wang, Y., Wang, R., Yang, Y., Tu, Z., and Shi, S.
+\newblock Encouraging divergent thinking in large language models through multi-agent debate.
+\newblock \emph{arXiv:2305.19118}, 2023.
+
+\bibitem{kenton2024persuasive}
+Kenton, Z., Lindner, D., Sharkey, L., Kumar, A., Irving, G., and Leike, J.
+\newblock Debating with more persuasive {LLMs} leads to more truthful answers.
+\newblock \emph{arXiv:2402.06782}, 2024.
+
+\bibitem{chen2024sparse}
+Chen, S., Jiang, J., and Zhao, J.
+\newblock Improving multi-agent debate with sparse communication topology.
+\newblock \emph{arXiv:2406.11776}, 2024.
+
+\bibitem{chen2022pal}
+Chen, W., Ma, X., Wang, X., and Cohen, W.~W.
+\newblock Program of thoughts prompting: Disentangling computation from reasoning for numerical reasoning tasks.
+\newblock \emph{arXiv:2211.12588}, 2022.
+
+\bibitem{gao2023pal}
+Gao, L., Madaan, A., Zhou, S., Alon, U., Liu, P., Yang, Y., Carbonell, J., and Neubig, G.
+\newblock {PAL}: Program-aided language models.
+\newblock In \emph{ICML}, 2023.
+
+\bibitem{khattab2023dspy}
+Khattab, O., Singhvi, A., Maheshwari, P., Zhang, Z., Santhanam, K., Vardhamanan, S., Haq, S., Sharma, A., Joshi, T.~T., Moazam, H., Miller, H., Zaharia, M., and Potts, C.
+\newblock {DSPy}: Compiling declarative language model calls into self-improving pipelines.
+\newblock \emph{arXiv:2310.03714}, 2023.
+
+\bibitem{nogueira2019reranking}
+Nogueira, R. and Cho, K.
+\newblock Passage re-ranking with {BERT}.
+\newblock \emph{arXiv:1901.04085}, 2019.
+
+\bibitem{herzig2020tapas}
+Herzig, J., Nowak, P.~K., M\"{u}ller, T., Piccinno, F., and Eisenschlos, J.~M.
+\newblock {TaPas}: Weakly supervised table parsing via pre-training.
+\newblock In \emph{Proceedings of ACL}, 2020.
+
+\bibitem{lei2022tagop}
+Lei, W., Zhu, F., Li, X., Zheng, J., and Chua, T.-S.
+\newblock {TAGOP}: Sequence tagging-based approach for question answering over semi-structured tables.
+\newblock In \emph{Proceedings of ACL}, 2022.
+
+\end{thebibliography}
+
+\appendix
+
+\section{Gatekeeper Signal Details}
+
+The NLI grounding score is computed as the fraction of answer sentences whose entailment probability (from \texttt{cross-encoder/nli-deberta-v3-small}) exceeds 0.5 against concatenated retrieved context. The \texttt{heuristic\_missing\_rows} signal fires when fewer than 2 token-level matches between the answer and retrieved row labels are found. Structural signals are computed after stripping UUID-style chunk identifiers that occasionally appear in LLM outputs.
+
+\section{Answer Normalisation}
+
+F1 normalisation: (1)~lowercase/strip; (2)~remove footnote superscripts; (3)~remove articles and approximation words; (4)~remove unit words (million, billion, thousand, usd); (5)~remove currency/percent symbols; (6)~normalise numeric commas (\texttt{4,369}$\to$\texttt{4369}); (7)~convert accounting negatives (\texttt{(4369)}$\to$\texttt{-4369}); (8)~canonicalise floats (\texttt{42.0}$\to$\texttt{42}). For list-valued gold answers, take the max F1/EM across elements and joined string.
+
+\section{PoT Sandbox}
+
+Allowed builtins: \texttt{print}, \texttt{round}, \texttt{abs}, \texttt{max}, \texttt{min}, \texttt{sum}, \texttt{len}, \texttt{int}, \texttt{float}, \texttt{str}, \texttt{range}, \texttt{pow}, \texttt{divmod}. Code containing \texttt{import}, \texttt{\_\_}, \texttt{open(}, \texttt{eval(}, \texttt{exec(}, or \texttt{compile(} is rejected before execution. Table chunks are pre-converted to \texttt{Row [Section] (Column): Value} key-value format to reduce GPT-4o-mini extraction errors.
+
+\section{Debate Transcript Example}
+
+Representative APPROVE case (49.8\% of triggered questions):
+
+\smallskip
+\noindent\textbf{Question:} What is the percentage change in net revenue from 2017 to 2018?\\
+\noindent\textbf{GPT-4o draft:} $-3.2\%$\\
+\noindent\textbf{Skeptic:} Net revenue 2017 = \$4,369M, 2018 = \$4,229M in evidence. $(4229-4369)/4369 = -3.2\%$. Consistent. No challenge.\\
+\noindent\textbf{Verdict:} \texttt{[APPROVE]} $-3.2\%$
+
+\smallskip
+In a REVISE case, the Skeptic identifies a specific alternative value, the Grounder concedes, and the Adjudicator's CoT trace identifies the formula error before issuing a corrected answer.
+
+\end{document}

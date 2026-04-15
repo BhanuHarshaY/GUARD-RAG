@@ -1,0 +1,4 @@
+type,n,baseline_f1,refinement_f1,guardrag_f1,guardrag_gain_vs_baseline,guardrag_gain_pct
+arithmetic,52,0.538,0.558,0.609,+0.071,+13.2%
+span,98,0.628,0.628,0.633,+0.005,+0.8%
+all,150,0.597,0.603,0.624,+0.027,+4.5%

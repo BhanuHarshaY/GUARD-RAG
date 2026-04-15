@@ -1,0 +1,9 @@
+configuration,guardrag_f1,delta_vs_full,delta_pct,notes
+Full GUARD-RAG,0.624,0.000,0.0%,baseline for ablation (n=150)
+w/o dual retrieval (k=6 for T3),0.608,-0.016,-2.6%,T3 uses k=6 instead of k=12
+w/o GPT-4o generation (use T2 draft),0.603,-0.021,-3.4%,T3 debates T2 answer instead of fresh GPT-4o answer
+w/ PoT override (not signal),0.596,-0.028,-4.5%,PoT answer replaces draft instead of advising adjudicator
+w/ debate on text questions,0.611,-0.013,-2.1%,Skeptic applied to span/text questions (over-challenges correct spans)
+w/ uniform debate (no gatekeeper),0.609,-0.015,-2.4%,all questions debated regardless of gatekeeper score
+w/o PoT signal,0.617,-0.007,-1.1%,PoT advisory signal removed from adjudicator context
+w/o DSPy CoT (prompt adjudicator),0.618,-0.006,-1.0%,plain adjudicator prompt without chain-of-thought

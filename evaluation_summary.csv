@@ -1,0 +1,2 @@
+system,n_samples,baseline_f1,refinement_f1,guardrag_f1,baseline_em,refinement_em,guardrag_em,baseline_avg_tokens,refinement_avg_tokens,guardrag_avg_tokens,baseline_avg_latency,refinement_avg_latency,guardrag_avg_latency,baseline_hallucination_rate,refinement_hallucination_rate,guardrag_hallucination_rate,guardrag_debate_rate,guardrag_abstention_rate,guardrag_approve_rate,guardrag_revise_rate
+improved,300,0.561,0.593,0.629,0.507,0.539,0.576,1102,2395,6101,0.877,2.339,5.630,0.728,0.733,0.710,0.521,0.000,0.498,0.023

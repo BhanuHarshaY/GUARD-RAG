@@ -1,0 +1,48 @@
+question,gold_answer,tier1_answer,tier2_answer,tier3_answer,tier1_f1,tier2_f1,tier3_f1,tier1_em,tier2_em,tier3_em,tier1_hallucination_rate,tier2_hallucination_rate,tier3_hallucination_rate,tier1_latency,tier2_latency,tier3_latency,tier1_tokens,tier2_tokens,tier3_tokens,tier3_debate_triggered,tier3_gatekeeper_score,tier3_threshold,tier3_adjudicator_verdict,mode
+What does the Weighted average actuarial assumptions consist of?,"['Rate of inflation', 'Rate of increase in salaries', 'Discount rate']","Discount rate, Rate of inflation2, Rate of increase in salaries","Discount rate, Rate of inflation2, Rate of increase in salaries","Discount rate, Rate of inflation2, Rate of increase in salaries",0.6666666666666666,0.6666666666666666,0.6666666666666666,0.0,0.0,0.0,0.0,0.0,0.0,4.231,28.382,4.231,1091,4349,1091,False,0.0,0.2,,improved
+How much is the 2019 rate of inflation?,['2.9'],2.9,2.9,2.9,1.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,11.327,53.838,11.327,1260,5015,1260,False,0.0,0.2,,improved
+How much is the 2018 rate of inflation?,['2.9'],2.9,2.9,2.9,1.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,14.53,49.06,14.53,1260,5016,1260,False,0.0,0.2,,improved
+What is the 2019 average rate of inflation?,2.9,2.9,2.9,2.9,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,10.575,43.787,10.575,1099,4371,1099,False,0.0,0.2,,improved
+What is the 2019 average rate of increase in salaries?,2.7,2.7,2.7,2.7,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,14.456,58.909,14.456,1478,5887,1478,False,0.0,0.2,,improved
+What is the difference between 2019 average rate of inflation and 2019 average rate of increase in salaries?,0.2,0.2,0.2,0.2,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,9.378,32.523,33.757,1087,3176,5698,True,0.6,0.2,REVISE,improved
+How was internally developed software capitalised?,['at cost less accumulated amortisation.'],Capitalised at cost less accumulated amortisation.,Capitalised at cost less accumulated amortisation.,Capitalised at cost less accumulated amortisation.,0.9090909090909091,0.9090909090909091,0.9090909090909091,0.0,0.0,0.0,1.0,1.0,1.0,12.607,51.67,12.607,1271,5064,1271,False,0.0,0.2,,improved
+How much was the closing net book amount for software under development in 2019?,"['16,284']","16,284","16,284","16,284",1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,13.405,54.039,47.982,1323,5267,6534,True,0.5,0.2,APPROVE,improved
+What was the total cost for 2019?,"['29,259']","$29,259","$29,259","$29,259",1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,14.399,56.0,54.647,1427,5684,7095,True,0.5,0.2,APPROVE,improved
+What was the percentage change in cost of software under development between 2018 and 2019?,150.18,150,150,150,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,14.451,31.515,48.253,1411,4305,6563,True,1.1,0.2,REVISE,improved
+Which year have greater total accumulated amortisation? ,['2019'],2019,2019,2019,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,14.427,39.628,66.454,1327,5282,6382,True,0.5,0.2,APPROVE,improved
+What was the difference between total opening and closing net book account in 2018?,4369,"4,369","6,522",4369,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,0.606,2.295,3.774,1405,4510,7391,True,1.1,0.2,REVISE,improved
+What is net sales from cheese in 2018 and 2019 respectively?,"['11,486', '11,459']","11,486 ; 11,459","11,486 ; 11,459","$10,349 ; $12,459",0.6666666666666666,0.6666666666666666,0.0,0.0,0.0,0.0,1.0,1.0,1.0,0.649,47.9,2.428,1421,5665,6427,True,0.5,0.2,REVISE,improved
+What is net sales from cream and other in 2018 and 2019 respectively?,"['5,276', '4,228']","5% 
+4%","5%
+4%","$131.4, $109.76",0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,0.514,23.873,1.929,1475,5881,7453,True,0.5,0.2,REVISE,improved
+What is net sales from ProBugs Kefir in 2018 and 2019 respectively?,"['2,795', '2,780']","$2,795 in 2018 
+$2,780 in 2019","$2,795 (2018), $2,780 (2019)","$2,795 in 2018 
+$2,780 in 2019",0.2857142857142857,0.4,0.2857142857142857,0.0,0.0,0.0,0.0,1.0,0.0,0.208,1.526,0.208,584,2320,584,False,0.0,0.2,,improved
+How many product categories are available?,6,4,3,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,33.614,1.546,33.614,1339,5329,1339,False,0.0,0.2,,improved
+What is the change in the net sales for cheese between 2018 and 2019?,-27,1,1,"To find the change in net sales for cheese between 2018 and 2019, we first need to understand the given values. The evidence provides percentages of net sales for cheese in 2018 and 2019, which are 11% and 12%, respectively. However, to calculate the change, we need the actual net sales values for cheese in both years, which are given as 11,459 for 2018 and 11,486 for 2019 (not 12,486 as mentioned in some claims, which seems to be an error).
+
+The change in net sales can be calculated as follows:
+Change = (Net sales in 2019 - Net sales in 2018) / Net sales in 2018 * 100
+
+Given:
+- Net sales in 2018 = 11,459
+- Net sales in 2019 = 11,486
+
+Change = (11,486 - 11,459) / 11,459 * 100
+Change = 27 / 11,459 * 100
+Change ≈ 0.2355%
+
+However, the question seems to be asking for a percentage change based on the provided percentages (11% for 2018 and 12% for 2019), which might imply the total net sales for each year. Since the total net sales for both years are given as 100% (with values for 2018 and 2019 being the same), we can calculate the actual sales for cheese in each year based on these percentages.
+
+Given the total net sales are not explicitly provided but implied to be the same for both years (as both years' total is 100%), let's assume the total net sales for",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.9286,1.347,18.09,54.369,1622,4649,7874,True,0.6,0.2,REVISE,improved
+What is the percentage change in net sales from Frozen Kefir between 2018 and 2019?,12.76,"Unfortunately, we cannot find the correct value for Frozen Kefir (a)",100,"To find the percentage change in net sales from Frozen Kefir between 2018 and 2019, we first need to understand the given values. The evidence shows that in 2018, the value for Frozen Kefir was 1%, and in 2019, it was 2%. However, these percentages are not directly usable for calculating the percentage change in net sales without knowing the base values they represent. Fortunately, another part of the evidence provides the actual net sales values for Frozen Kefir in 2018 and 2019, which are 1,617 and 1,434, respectively, but these seem to be associated with different columns and might not directly represent net sales. However, assuming these are the correct base values for the percentages given (which seems to be a misunderstanding since the percentages are given as 1% and 2% without clear reference to what they represent), we would calculate the percentage change as follows:
+
+Given:
+- 2018 value = 1,617 (assuming this is the base for the 1% figure, though the connection is not clear)
+- 2019 value = 1,434 (assuming this is the base for the 2% figure, though the connection is not clear)
+
+However, the percentages given (1% and 2%) do not seem to directly relate to these numbers in a straightforward manner based on the information provided. If we were to calculate the percentage change based on the assumption that these percentages directly represent the change in sales (which is not explicitly stated but seems to be the only numerical data provided for Frozen Kefir), we would still need to clarify what these percentages represent. 
+
+Given the confusion and the lack of clear connection",0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.8182,0.943,2.004,11.354,1776,5031,7213,True,1.1,0.2,REVISE,improved
+Why did the Operating revenues decreased from 2018 to 2019? ,"['primarily due to decreased other operating revenues, decreased foundry wafer sale, and 2.5% depreciation of the NTD in 2019 from 2018.']",2.0%,2.0%,2.0%,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,4.738,1.484,6.811,1277,5083,6261,True,0.5,0.2,APPROVE,improved
+Why did the Operating costs decreased from 2018 to 2019?,"['primarily due to the decreased depreciation expense and other operating costs, which was partially offset by the increased direct material costs.']","primarily due to the decreased depreciation expense and other operating costs, which was partially offset by the increased direct material costs.","Primarily due to the decreased depreciation expense and other operating costs, which was partially offset by the increased direct material costs.","primarily due to the decreased depreciation expense and other operating costs, which was partially offset by the increased direct material costs.",1.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,20.963,2.1,20.963,1379,5511,1379,False,0.0,0.2,,improved
